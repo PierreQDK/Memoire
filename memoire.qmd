@@ -242,7 +242,61 @@ print(vol_sep)
 ---------
 # DID
 ```{r}
+# Chargement des packages
+library(plm)
+library(dplyr)
+library(tibble)
+library(lmtest)
+library(sandwich)
+# Fonction pour exécuter un modèle DiD TWFE avec erreurs standards Driscoll-Kraay
+run_did <- function(data, contract_name) {
+  data$Date <- as.Date(as.character(data$Date))
 
+  # Créer les variables AVANT de passer en pdata.frame
+  treat <- ifelse(grepl("CHI", data$Indiv), 1, 0)
+  post <- ifelse(data$Date >= as.Date("1926-02-01"), 1, 0)
+  data$Treat_Post <- treat * post
+
+  # Panelisation
+  data <- pdata.frame(data, index = c("Indiv", "Date"))
+
+  # Régression TWFE
+  model <- tryCatch({
+    plm(Close ~ Treat_Post, data = data, effect = "twoways", model = "within", na.action = na.omit)
+  }, error = function(e) NULL)
+
+  if (is.null(model)) {
+    return(tibble(
+      Contrat = contract_name,
+      Coef = NA,
+      SE = NA,
+      Stars = NA,
+      N = NA,
+      T = NA,
+      NT = NA
+    ))
+  }
+
+  est <- coef(model)["Treat_Post"]
+  se <- coeftest(model, vcovSCC(model, type = "HC0"))["Treat_Post", "Std. Error"]
+  tval <- est / se
+  pval <- 2 * pt(abs(tval), df = model$df.residual, lower.tail = FALSE)
+  stars <- ifelse(pval < 0.001, "***", ifelse(pval < 0.01, "**", ifelse(pval < 0.05, "*", "")))
+
+  N <- length(unique(data$Indiv))
+  T <- length(unique(data$Date))
+  NT <- nobs(model)
+
+  return(tibble(
+    Contrat = contract_name,
+    Coef = round(est, 3),
+    SE = paste0(format(round(se, 3), nsmall = 3), stars),
+    N = N,
+    T = T,
+    NT = NT
+  ))
+}
+results_did
 ```
 
 
