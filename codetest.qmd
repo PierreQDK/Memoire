@@ -247,3 +247,108 @@ print(vol_sep)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------
+
+# Régression Difference-in-Differences (DiD) sur le prix de clôture
+```{r did-close}
+a1_treated <- a1[grepl("CHI-WHEAT", a1$Indiv), ]
+a1_control <- a1[grepl("KC_WHEAT|STL-WHEAT", a1$Indiv), ]
+a1_did_sample <- rbind(a1_treated, a1_control)
+a1_did_sample <- pdata.frame(a1_did_sample, index = c("Indiv", "Date"))
+
+# Ensuite : modélisation DiD
+did_model <- plm(Close ~ Treat_Post, data = a1_did_sample, effect = "twoways", model = "within", na.action = na.omit)
+summary(did_model)
+# Test de robustesse avec des effets fixes individuels et temporels
+did_model2 <- plm(Close ~ Treat_Post, data = a1_did_sample, effect = "individual", model = "within", na.action = na.omit)
+summary(did_model2)
+```
+
+# Graphique de la régression DiD sur le prix de clôture
+```{r graph-did-close}
+a1_did_sample %>%
+  ggplot(aes(x = Date, y = Close, group = Indiv)) + 
+  geom_line(aes(color = Indiv), linewidth = 1) +
+  labs(title = "Prix à terme du blé - Régression DiD", x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed")
+```
+
+
+# Visualisation graphique de l'effet DiD estimé (premier modèle)
+```{r graph-did-main}
+# Ajouter la moyenne par groupe et période
+library(dplyr)
+a1_did_sample <- rbind(
+  a1[grepl("CHI-WHEAT", a1$Indiv), ],
+  a1[grepl("KC_WHEAT|STL-WHEAT", a1$Indiv), ]
+)
+a1_did_sample <- a1_did_sample %>%
+  mutate(Groupe = ifelse(grepl("CHI", Indiv), "Treated", "Control"),
+         Période = ifelse(Date >= as.Date("1926-02-01"), "Après", "Avant"))
+
+mean_did <- a1_did_sample %>%
+  group_by(Groupe, Période) %>%
+  summarise(Prix_moyen = mean(Close, na.rm = TRUE), .groups = "drop")
+
+# Graphique de l'effet DiD
+library(ggplot2)
+ggplot(mean_did, aes(x = Période, y = Prix_moyen, group = Groupe, color = Groupe)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 3) +
+  labs(title = "Effet estimé de la novation (DiD) sur les prix à terme",
+       x = "Période", y = "Prix moyen") +
+  theme_minimal()
+```
+
+# Calcul de la volatilité glissante (écart-type sur une fenêtre de 15 jours)
+```{r rolling-volatility}
+a1_sub$rolling_sd <- rollapply(a1_sub$Close, width = 15, FUN = sd, align = "right", fill = NA, na.rm = TRUE)
+```
+
+# Graphique de la volatilité glissante des prix autour de la date de novation
+```{r graph-volatility}
+subset(a1_sub, !is.na(rolling_sd)) %>%
+  ggplot(aes(x = Date, y = rolling_sd, group = Indiv)) + 
+  geom_line(aes(color = Indiv), linewidth = 1) +
+  labs(title = "Volatilité glissante (15 jours)", x = "Date", y = "Écart-type") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed")
+```
+
+# Régression DiD sur la volatilité glissante
+```{r did-volatility}
+did2 <- plm(rolling_sd ~ Treat_Post, data = a1_sub, effect = "twoways", model = "within", na.action = na.omit)
+summary(did2)
+```
+
+# Préparation des matrices pour estimation Synthetic DiD (SDID) sur les prix
+```{r synthdid-setup}
+setup <- panel.matrices(as.data.frame(as_tibble(a1_sub)), unit = 1, time = 2, outcome = 7, treatment = 6)
+tau.sdid <- synthdid_estimate(setup$Y, setup$N0, setup$T0)
+summary(tau.sdid)
+```
+
+# Visualisation du résultat de l'estimation SDID
+```{r synthdid-plot}
+plot(tau.sdid)
+```
+
+# Calcul de l'intervalle de confiance autour de l'estimateur SDID
+```{r synthdid-ci}
+se <- sqrt(vcov(tau.sdid, method = 'placebo'))
+sprintf("Point estimate: %1.2f", tau.sdid)
+sprintf("95%% CI: (%1.2f, %1.2f)", tau.sdid - 1.96 * se, tau.sdid + 1.96 * se)
+```
