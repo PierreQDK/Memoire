@@ -3,9 +3,245 @@ title: "Memoire"
 format: html
 editor: visual
 ---
+# Chargement des librairies nécessaires pour l'analyse
+```{r setup, include=FALSE}
+# Chargement des librairies (comme dans ton script)
+library(tibble)
+library(plm)
+library(lmtest)
+library(ggplot2)
+library(haven)
+library("writexl")
+library(readxl)
+library(zoo)
+library(lubridate)
+library(clubSandwich)
+library(DIDmultiplegt)
+library(synthdid)
+library(ggallin)
+library(ggthemes)
+library(ggridges)
+library(GGally)
+library(ggeffects)
+library(effects)
+library(gtsummary)
+library(stats)
+library(ggcorrplot)
+library(ggTimeSeries)
+library(car)
+library(plotly)
+library(tidyr)
+library(tidyverse)
+library(conflicted)
+library(elo)
+library(forecast)
+library(nortsTest)
+library(strucchange)
+library(bsts)
+library(Hmisc)
+library(stargazer)
+library(performance)
+library(Kendall)
+library(naniar)
+library(scales)
+library(mgcv)
+library(e1071)
+library(dplyr)
+library(roll)
+library(EnvCpt)
+library(viridis)
+library(ineq)
+library(gglorenz)
+library(gridExtra)
+library(changepoint)
+```
 
-# Import des données
+# Fonction utilitaire pour transformer année/mois/jour en objet Date
+```{r date-fn}
+toDate <- function(year, month, day) {
+  ISOdate(year, month, day)
+}
+```
 
-```{r}
 
+
+# Import et nettoyage de la feuille 'panel7' (calcul des variables traitement, post, interaction)
+```{r import-clean}
+a1 <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "panel7")
+a1$Date <- as.Date(toDate(a1$Year, a1$Month, a1$Day))
+a1$Treatment <- ifelse(grepl("CHI", a1$Indiv), 1, 0)
+a1$Post <- ifelse(a1$Date >= as.Date("1926-02-01"), 1, 0)
+a1$Treat_Post <- a1$Treatment * a1$Post
+a1 <- pdata.frame(a1, index = c("Indiv", "Date"))
+a1$Date <- as.Date(as.character(a1$Date))  # Correction type date
+pdim(a1)
+```
+
+
+# GraphiUE DE CHAQUE MATIÈRES PREmière et volatilités
+
+## MAY
+### Filtrage des contrats échéance MAY (blé et maïs)
+```{r filter-mai}
+contracts_mai <- a1[grepl("MAY", a1$Indiv), ]
+contracts_mai_wheat <- contracts_mai[grepl("WHEAT", contracts_mai$Indiv), ]
+contracts_mai_corn <- contracts_mai[grepl("CORN", contracts_mai$Indiv), ]
+```
+
+### Visualisation des prix de clôture - échéance MAY - WHEAT
+```{r graph-mai-wheat}
+ggplot(subset(contracts_mai_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du blé - Contrats échéance MAY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Visualisation des prix de clôture - échéance MAY - CORN
+```{r graph-mai-corn}
+ggplot(subset(contracts_mai_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du maïs - Contrats échéance MAY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+
+### Calcul de la volatilité simple par contrat - MAY
+```{r volatility-mai}
+library(dplyr)
+vol_ma <- contracts_mai %>%
+  group_by(Indiv) %>%
+  summarise(volatilite = sd(Close, na.rm = TRUE))
+print(vol_ma)
+```
+
+## JUNE
+### Filtrage des contrats échéance JULY (blé et maïs)
+```{r filter-july}
+contracts_july <- a1[grepl("JULY", a1$Indiv), ]
+contracts_july_wheat <- contracts_july[grepl("WHEAT", contracts_july$Indiv), ]
+contracts_july_corn <- contracts_july[grepl("CORN", contracts_july$Indiv), ]
+```
+
+### Visualisation des prix de clôture - échéance JULY - WHEAT
+```{r graph-july-wheat}
+ggplot(subset(contracts_july_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du blé - Contrats échéance JULY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Visualisation des prix de clôture - échéance JULY - CORN
+```{r graph-july-corn}
+ggplot(subset(contracts_july_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du maïs - Contrats échéance JULY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - JULY
+```{r volatility-july}
+vol_july <- contracts_july %>%
+  group_by(Indiv) %>%
+  summarise(volatilite = sd(Close, na.rm = TRUE))
+print(vol_july)
+```
+
+## SEPTEMBER
+### Filtrage des contrats échéance SEPTEMBER (blé et maïs)
+```{r filter-september}
+contracts_sep <- a1[grepl("SEPTEMBER", a1$Indiv), ]
+contracts_sep_wheat <- contracts_sep[grepl("WHEAT", contracts_sep$Indiv), ]
+contracts_sep_corn <- contracts_sep[grepl("CORN", contracts_sep$Indiv), ]
+```
+
+### Visualisation des prix de clôture - échéance SEPTEMBER - WHEAT
+```{r graph-sep-wheat}
+ggplot(subset(contracts_sep_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du blé - Contrats échéance SEPTEMBER (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Visualisation des prix de clôture - échéance SEPTEMBER - CORN
+```{r graph-sep-corn}
+ggplot(subset(contracts_sep_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme du maïs - Contrats échéance SEPTEMBER (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - SEPTEMBER
+```{r volatility-september}
+vol_sep <- contracts_sep %>%
+  group_by(Indiv) %>%
+  summarise(volatilite = sd(Close, na.rm = TRUE))
+print(vol_sep)
+```
+
+
+
+--------
+
+
+# Régression Difference-in-Differences (DiD) sur le prix de clôture
+```{r did-close}
+did1 <- plm(Close ~ Treat_Post, data = a1_sub, effect = "twoways", model = "within", na.action = na.omit)
+summary(did1)
+```
+
+# Calcul de la volatilité glissante (écart-type sur une fenêtre de 15 jours)
+```{r rolling-volatility}
+a1_sub$rolling_sd <- rollapply(a1_sub$Close, width = 15, FUN = sd, align = "right", fill = NA, na.rm = TRUE)
+```
+
+# Graphique de la volatilité glissante des prix autour de la date de novation
+```{r graph-volatility}
+subset(a1_sub, !is.na(rolling_sd)) %>%
+  ggplot(aes(x = Date, y = rolling_sd, group = Indiv)) + 
+  geom_line(aes(color = Indiv), linewidth = 1) +
+  labs(title = "Volatilité glissante (15 jours)", x = "Date", y = "Écart-type") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed")
+```
+
+# Régression DiD sur la volatilité glissante
+```{r did-volatility}
+did2 <- plm(rolling_sd ~ Treat_Post, data = a1_sub, effect = "twoways", model = "within", na.action = na.omit)
+summary(did2)
+```
+
+# Préparation des matrices pour estimation Synthetic DiD (SDID) sur les prix
+```{r synthdid-setup}
+setup <- panel.matrices(as.data.frame(as_tibble(a1_sub)), unit = 1, time = 2, outcome = 7, treatment = 6)
+tau.sdid <- synthdid_estimate(setup$Y, setup$N0, setup$T0)
+summary(tau.sdid)
+```
+
+# Visualisation du résultat de l'estimation SDID
+```{r synthdid-plot}
+plot(tau.sdid)
+```
+
+# Calcul de l'intervalle de confiance autour de l'estimateur SDID
+```{r synthdid-ci}
+se <- sqrt(vcov(tau.sdid, method = 'placebo'))
+sprintf("Point estimate: %1.2f", tau.sdid)
+sprintf("95%% CI: (%1.2f, %1.2f)", tau.sdid - 1.96 * se, tau.sdid + 1.96 * se)
 ```
