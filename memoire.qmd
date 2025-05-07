@@ -3,7 +3,9 @@ title: "Memoire"
 format: html
 editor: visual
 ---
+
 # Chargement des librairies nécessaires pour l'analyse
+
 ```{r setup, include=FALSE}
 # Chargement des librairies (comme dans ton script)
 library(tibble)
@@ -57,15 +59,15 @@ library(changepoint)
 ```
 
 # Fonction utilitaire pour transformer année/mois/jour en objet Date
+
 ```{r date-fn}
 toDate <- function(year, month, day) {
   ISOdate(year, month, day)
 }
 ```
 
-
-
 # Import et nettoyage de la feuille 'panel7' (calcul des variables traitement, post, interaction)
+
 ```{r import-clean}
 a1 <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "panel7")
 a1$Date <- as.Date(toDate(a1$Year, a1$Month, a1$Day))
@@ -77,11 +79,12 @@ a1$Date <- as.Date(as.character(a1$Date))  # Correction type date
 pdim(a1)
 ```
 
-
 # GRAPHIQUE DE CHAQUE MATIÈRE PREMIÈRE ET VOLATILITÉS
 
 ## MAY
+
 ### Filtrage des contrats échéance MAY (blé et maïs)
+
 ```{r filter-mai}
 contracts_mai <- a1[grepl("MAY", a1$Indiv), ]
 contracts_mai_wheat <- contracts_mai[grepl("WHEAT", contracts_mai$Indiv), ]
@@ -89,6 +92,7 @@ contracts_mai_corn <- contracts_mai[grepl("CORN", contracts_mai$Indiv), ]
 ```
 
 ### Visualisation des prix de clôture - échéance MAY - WHEAT
+
 ```{r graph-mai-wheat}
 ggplot(subset(contracts_mai_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -100,6 +104,7 @@ ggplot(subset(contracts_mai_wheat, !is.na(Close)), aes(x = Date, y = Close, colo
 ```
 
 ### Visualisation des prix de clôture - échéance MAY - CORN
+
 ```{r graph-mai-corn}
 ggplot(subset(contracts_mai_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -111,6 +116,7 @@ ggplot(subset(contracts_mai_corn, !is.na(Close)), aes(x = Date, y = Close, color
 ```
 
 ### Visualisation graphique de l'effet DiD estimé - échéance MAY
+
 ```{r graph-did-mai}
 a1_did_sample_mai <- rbind(
   a1[grepl("CHI-WHEAT-MAY", a1$Indiv), ],
@@ -133,6 +139,7 @@ ggplot(mean_did_mai, aes(x = Période, y = Prix_moyen, group = Groupe, color = G
 ```
 
 ### Calcul de la volatilité simple par contrat - MAY
+
 ```{r volatility-mai}
 vol_ma <- contracts_mai %>%
   group_by(Indiv) %>%
@@ -141,7 +148,9 @@ print(vol_ma)
 ```
 
 ## JULY
+
 ### Filtrage des contrats échéance JULY (blé et maïs)
+
 ```{r filter-july}
 contracts_july <- a1[grepl("JULY", a1$Indiv), ]
 contracts_july_wheat <- contracts_july[grepl("WHEAT", contracts_july$Indiv), ]
@@ -149,6 +158,7 @@ contracts_july_corn <- contracts_july[grepl("CORN", contracts_july$Indiv), ]
 ```
 
 ### Visualisation des prix de clôture - échéance JULY - WHEAT
+
 ```{r graph-july-wheat}
 ggplot(subset(contracts_july_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -160,6 +170,7 @@ ggplot(subset(contracts_july_wheat, !is.na(Close)), aes(x = Date, y = Close, col
 ```
 
 ### Visualisation des prix de clôture - échéance JULY - CORN
+
 ```{r graph-july-corn}
 ggplot(subset(contracts_july_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -171,6 +182,7 @@ ggplot(subset(contracts_july_corn, !is.na(Close)), aes(x = Date, y = Close, colo
 ```
 
 ### Visualisation graphique de l'effet DiD estimé - échéance JULY
+
 ```{r graph-did-july}
 a1_did_sample_july <- rbind(
   a1[grepl("CHI-WHEAT-JULY", a1$Indiv), ],
@@ -193,6 +205,7 @@ ggplot(mean_did_july, aes(x = Période, y = Prix_moyen, group = Groupe, color = 
 ```
 
 ### Calcul de la volatilité simple par contrat - JULY
+
 ```{r volatility-july}
 vol_july <- contracts_july %>%
   group_by(Indiv) %>%
@@ -201,7 +214,9 @@ print(vol_july)
 ```
 
 ## SEPTEMBER
+
 ### Filtrage des contrats échéance SEPTEMBER (blé et maïs)
+
 ```{r filter-september}
 contracts_sep <- a1[grepl("SEPTEMBER", a1$Indiv), ]
 contracts_sep_wheat <- contracts_sep[grepl("WHEAT", contracts_sep$Indiv), ]
@@ -209,6 +224,7 @@ contracts_sep_corn <- contracts_sep[grepl("CORN", contracts_sep$Indiv), ]
 ```
 
 ### Visualisation des prix de clôture - échéance SEPTEMBER - WHEAT
+
 ```{r graph-sep-wheat}
 ggplot(subset(contracts_sep_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -220,6 +236,7 @@ ggplot(subset(contracts_sep_wheat, !is.na(Close)), aes(x = Date, y = Close, colo
 ```
 
 ### Visualisation des prix de clôture - échéance SEPTEMBER - CORN
+
 ```{r graph-sep-corn}
 ggplot(subset(contracts_sep_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
@@ -231,6 +248,7 @@ ggplot(subset(contracts_sep_corn, !is.na(Close)), aes(x = Date, y = Close, color
 ```
 
 ### Calcul de la volatilité simple par contrat - SEPTEMBER
+
 ```{r volatility-september}
 vol_sep <- contracts_sep %>%
   group_by(Indiv) %>%
@@ -238,16 +256,206 @@ vol_sep <- contracts_sep %>%
 print(vol_sep)
 ```
 
+## IMPORT ET PRÉPARATION DES DONNÉES OATS
 
----------
-# DID
+### Chargement et nettoyage de la feuille "New"
+
+```{r import-oats}
+a2 <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "New")
+#view(a2)
+
+a2 <- a2 %>%
+  dplyr::filter(!is.na(Year) & !is.na(Month) & !is.na(Day)) %>%
+  mutate(
+    Date = as.Date(ISOdate(Year, Month, Day)),
+    CLOSE = as.numeric(CLOSE),
+    Treatment = ifelse(grepl("^CHI-", ID), 1, 0),
+    Post = ifelse(Date >= as.Date("1926-02-01"), 1, 0),
+    Treat_Post = Treatment * Post
+  ) %>%
+  dplyr::filter(!is.na(CLOSE)) # ✅ uniquement supprimer les lignes où CLOSE est NA
+
+# Créer un panel sans rien trier
+a2 <- pdata.frame(a2, index = c("ID", "Date"))
+```
+
+## MAY - OATS
+
+### Filtrage des contrats échéance MAY - OATS
+
+```{r filter-mai-oats}
+a2$Date <- as.Date(a2$Date)
+
+contracts_mai_oats <- a2 %>%
+  dplyr::filter(grepl("MAY", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(Date >= as.Date("1926-01-04"))
+```
+
+### Visualisation des prix de clôture - échéance MAY - OATS
+
+```{r graph-mai-oats}
+ggplot(contracts_mai_oats, aes(x = Date, y = CLOSE, color = ID)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme de l’avoine - Contrats échéance MAY (feuille 'New')",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - MAY - OATS
+
+```{r volatility-mai-oats}
+volatilite_mai_oats <- contracts_mai_oats %>%
+  group_by(ID) %>%
+  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
+  arrange(desc(Volatilite))
+
+print(volatilite_mai_oats)
+```
+
+## JULY - OATS
+
+### Filtrage des contrats échéance JULY - OATS
+
+```{r filter-july-oats}
+contracts_july_oats <- a2 %>%
+  dplyr::filter(grepl("JUL", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(Date >= as.Date("1926-01-04"))
+```
+
+### Visualisation des prix de clôture - échéance JULY - OATS
+
+```{r graph-july-oats}
+ggplot(subset(contracts_july_oats, !is.na(CLOSE)), aes(x = Date, y = CLOSE, color = ID)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme de l'avoine - Contrats échéance JULY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - JULY - OATS
+
+```{r volatility-july-oats}
+volatilite_july_oats <- contracts_july_oats %>%
+  group_by(ID) %>%
+  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
+  arrange(desc(Volatilite))
+
+print(volatilite_july_oats)
+```
+
+------------------------------------------------------------------------
+
+# Estimation des tendances parraleles
+
 ```{r}
-# Chargement des packages
-library(plm)
 library(dplyr)
-library(tibble)
-library(lmtest)
-library(sandwich)
+library(broom)
+
+# ⚙️ Prétraitement des données
+a1_pre <- a1 %>%
+  filter(Date < as.Date("1926-02-01")) %>%
+  mutate(
+    time_to_treat = as.numeric(Date - as.Date("1925-01-01")),
+    Treatment = ifelse(grepl("CHI", Indiv), 1, 0)
+  )
+
+# 🟧 FONCTION de test des tendances parallèles
+test_parallel <- function(data, label) {
+  data <- data %>%
+    mutate(Interaction = Treatment * time_to_treat)
+
+  model <- lm(Close ~ time_to_treat + Treatment + Interaction, data = data)
+  result <- tidy(model) %>% filter(term == "Interaction")
+
+  if (nrow(result) == 0) return(NULL)
+
+  pval <- result$p.value
+  sig <- ifelse(pval < 0.01, "***", ifelse(pval < 0.05, "**", ifelse(pval < 0.1, "*", "")))
+
+  tibble(
+    Commodity = label,
+    coef = round(result$estimate, 3),
+    p_value = round(pval, 3),
+    stars = sig
+  )
+}
+
+# 🔹 Test pour le CORN
+corn_data <- a1_pre %>% filter(grepl("CORN", Indiv, ignore.case = TRUE))
+res_corn <- test_parallel(corn_data, "CORN")
+
+# 🔹 Test pour le WHEAT
+wheat_data <- a1_pre %>% filter(grepl("WHEAT", Indiv, ignore.case = TRUE))
+res_wheat <- test_parallel(wheat_data, "WHEAT")
+
+# 📊 Résultat global
+test_parallel_results <- bind_rows(res_corn, res_wheat)
+print(test_parallel_results)
+
+```
+
+il n’y a pas de différence significative dans les tendances pré-traitement entre le groupe traité et les autres.
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# 🔹 Étape 1 : filtrer période pré-traitement
+a1_pre <- a1 %>%
+  filter(Date < as.Date("1926-02-01")) %>%
+  mutate(
+    Treatment = ifelse(grepl("CHI", Indiv), "Chicago", "Autres"),
+    Commodity = case_when(
+      grepl("CORN", Indiv, ignore.case = TRUE) ~ "CORN",
+      grepl("WHEAT", Indiv, ignore.case = TRUE) ~ "WHEAT",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(Commodity))
+
+# 🔹 Étape 2 : moyenne par Date et groupe
+pretrend_summary <- a1_pre %>%
+  group_by(Date, Treatment, Commodity) %>%
+  summarise(mean_price = mean(Close, na.rm = TRUE), .groups = "drop")
+
+# 🔹 Étape 3 : graphique pour le CORN
+ggplot(pretrend_summary %>% filter(Commodity == "CORN"),
+       aes(x = Date, y = mean_price, color = Treatment)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Tendances pré-traitement - CORN",
+       subtitle = "Chicago vs autres marchés",
+       x = "Date", y = "Prix moyen de clôture") +
+  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# 🔹 Étape 4 : graphique pour le WHEAT
+ggplot(pretrend_summary %>% filter(Commodity == "WHEAT"),
+       aes(x = Date, y = mean_price, color = Treatment)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Tendances pré-traitement - WHEAT",
+       subtitle = "Chicago vs autres marchés",
+       x = "Date", y = "Prix moyen de clôture") +
+  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+
+Confirme l'interprétation au dessus 
+
+# DID
+
+```{r}
 # Fonction pour exécuter un modèle DiD TWFE avec erreurs standards Driscoll-Kraay
 run_did <- function(data, contract_name) {
   data$Date <- as.Date(as.character(data$Date))
@@ -296,8 +504,105 @@ run_did <- function(data, contract_name) {
     NT = NT
   ))
 }
-results_did
+# Liste des sous-échantillons à tester
+contrats <- list(
+  "May wheat"  = a1[grepl("WHEAT.MAY",  a1$Indiv), ],
+  "July wheat" = a1[grepl("WHEAT.JULY", a1$Indiv), ],
+  "May corn"   = a1[grepl("CORN.MAY",   a1$Indiv), ],
+  "July corn"  = a1[grepl("CORN.JULY",  a1$Indiv), ]
+)
+
+# Application de la fonction sur chaque contrat
+results_did <- bind_rows(lapply(names(contrats), function(nom) {
+  run_did(contrats[[nom]], nom)
+}))
+
+# Affichage du tableau final
+print(results_did)
+
+
 ```
 
+## Grapgqiue 
 
 
+
+
+
+
+
+
+
+# receipts and shipment
+
+```{r}
+# 📦 Chargement des packages nécessaires
+library(readxl)
+library(dplyr)
+library(plm)
+library(lmtest)
+library(sandwich)
+library(tibble)
+
+# 📁 Chargement des données depuis la feuille 5
+df <- read_excel("Dataset1920_ln.xlsx", sheet = "Sheet4")
+
+# 📅 Transformation de la date
+df <- df %>%
+  mutate(MONTH = as.Date(MONTH))
+
+# 📆 Filtrage sur la période de la novation : 1924 à 1927
+df <- df %>%
+  filter(MONTH >= as.Date("1924-01-01") & MONTH <= as.Date("1927-12-31"))
+
+# 🎯 Création des variables de traitement
+df <- df %>%
+  mutate(
+    POST = ifelse(MONTH >= as.Date("1926-02-01"), 1, 0),
+    Treat_Post = TREATMENT * POST
+  )
+
+# 🧪 Fonction d'estimation TWFE avec SE robustes
+run_did <- function(outcome_name) {
+  data <- df %>% filter(!is.na(.data[[outcome_name]]))
+  
+  panel <- pdata.frame(data, index = c("INDIVIDU", "MONTH"))
+
+  model <- plm(as.formula(paste(outcome_name, "~ Treat_Post")),
+               data = panel,
+               effect = "twoways", model = "within", na.action = na.omit)
+  
+  se <- coeftest(model, vcovSCC(model, type = "HC0"))["Treat_Post", "Std. Error"]
+  est <- coef(model)["Treat_Post"]
+  tval <- est / se
+  pval <- 2 * pt(abs(tval), df = model$df.residual, lower.tail = FALSE)
+  stars <- ifelse(pval < 0.001, "***", ifelse(pval < 0.01, "**", ifelse(pval < 0.05, "*", "")))
+
+  N <- length(unique(data$INDIVIDU))
+  N1 <- length(unique(data$INDIVIDU[data$TREATMENT == 1]))
+  N0 <- length(unique(data$INDIVIDU[data$TREATMENT == 0]))
+  T <- length(unique(data$MONTH))
+  T1 <- length(unique(data$MONTH[data$POST == 1]))
+  T0 <- length(unique(data$MONTH[data$POST == 0]))
+  NT <- nobs(model)
+
+  return(tibble(
+    Outcome = outcome_name,
+    Coef = round(est, 3),
+    SE = paste0(format(round(se, 3), nsmall = 3), stars),
+    N = N, N0 = N0, N1 = N1,
+    T = T, T0 = T0, T1 = T1,
+    NT = NT
+  ))
+}
+
+# 🧾 Exécution sur RECEIPTS et SHIPMENTS
+results_novation <- bind_rows(
+  run_did("RECEIPTS"),
+  run_did("SHIPMENTS")
+)
+
+# 🖥️ Affichage
+print(results_novation)
+
+```
