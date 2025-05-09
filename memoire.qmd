@@ -606,3 +606,100 @@ results_novation <- bind_rows(
 print(results_novation)
 
 ```
+
+
+
+
+# ACF & PACF 
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Corrélélogrammes avec acf()
+wheat_chicago <- a1 %>% filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv))
+corn_chicago  <- a1 %>% filter(grepl("CORN", Indiv), grepl("CHI", Indiv))
+
+# Prétraitement
+wheat_pre <- wheat_chicago %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
+corn_pre  <- corn_chicago  %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
+
+# Post-traitement
+wheat_post <- wheat_chicago %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
+corn_post  <- corn_chicago  %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
+
+# Afficher les ACF (20 lags)
+par(mfrow = c(2, 2))
+acf(wheat_pre$Close, main = "ACF – Chicago Wheat (pré 1926)", lag.max = 20)
+acf(wheat_post$Close, main = "ACF – Chicago Wheat (post 1926)", lag.max = 20)
+acf(corn_pre$Close, main = "ACF – Chicago Corn (pré 1926)", lag.max = 20)
+acf(corn_post$Close, main = "ACF – Chicago Corn (post 1926)", lag.max = 20)
+
+```
+
+
+# Statistiques descriptives
+## WHEAT - Chicago
+```{r}
+wheat_chicago <- a1 %>%
+  filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv), !is.na(Close))
+
+basicStats(as.numeric(wheat_chicago$Close))
+range(wheat_chicago$Date)
+
+```
+## WHEAT - Autres villes
+```{r}
+library(dplyr)
+library(fBasics)
+
+# Filtrer les contrats WHEAT hors Chicago
+wheat_autres <- a1 %>%
+  filter(grepl("WHEAT", Indiv), !grepl("CHI", Indiv), !is.na(Close))
+
+# Calcul des statistiques
+basicStats(as.numeric(wheat_autres$Close))
+
+```
+
+
+
+```{r}
+# Extraire les identifiants "autres" pour WHEAT et CORN
+autres_villes <- a1 %>%
+  filter(grepl("WHEAT|CORN", Indiv), !grepl("CHI", Indiv)) %>%
+  distinct(Indiv) %>%
+  arrange(Indiv)
+
+print(autres_villes)
+
+```
+
+## CORN - Chicago
+
+```{r}
+library(dplyr)
+library(fBasics)
+
+# Filtrer les contrats CORN à Chicago
+corn_chicago <- a1 %>%
+  filter(grepl("CORN", Indiv), grepl("CHI", Indiv), !is.na(Close))
+
+# Statistiques descriptives
+basicStats(as.numeric(corn_chicago$Close))
+
+```
+
+
+## CORN - Autres villes
+
+```{r}
+# Filtrer les contrats CORN hors Chicago
+corn_autres <- a1 %>%
+  filter(grepl("CORN", Indiv), !grepl("CHI", Indiv), !is.na(Close))
+
+# Statistiques descriptives
+basicStats(as.numeric(corn_autres$Close))
+
+```
+
