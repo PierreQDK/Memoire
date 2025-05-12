@@ -5,6 +5,7 @@ editor: visual
 ---
 
 # Chargement des librairies nécessaires pour l'analyse
+
 ```{r setup, include=FALSE}
 # Chargement des librairies
 library(tibble)
@@ -58,6 +59,7 @@ library(changepoint)
 ```
 
 # Fonction utilitaire pour transformer année/mois/jour en objet Date
+
 ```{r date-fn}
 toDate <- function(year, month, day) {
   ISOdate(year, month, day)
@@ -65,6 +67,7 @@ toDate <- function(year, month, day) {
 ```
 
 # Import et nettoyage de la feuille "New" (avec ID, CLOSE, Date, etc.)
+
 ```{r import-new}
 df <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "New")
 df <- df %>%
@@ -84,6 +87,7 @@ df <- df %>%
 # GRAPHIQUE DE CHAQUE MATIÈRE PREMIÈRE ET VOLATILITÉS
 
 ## Visualisation des prix et volatilité par produit
+
 ```{r prix-volatilite-produits}
 # Graphique de l'évolution des prix
 ggplot(df, aes(x = Date, y = CLOSE, color = Produit)) +
@@ -103,6 +107,7 @@ print(volatilite_par_ID)
 ```
 
 ## Graphiques spécifiques par échéance (MAY, JULY, SEPTEMBER)
+
 ```{r graphiques-echeances}
 echeances <- c("MAY", "JULY", "SEPTEMBER")
 produits <- c("WHEAT", "CORN", "OATS")
@@ -125,6 +130,7 @@ for (echeance in echeances) {
 ```
 
 ## Volatilité par échéance
+
 ```{r volatilite-par-echeance}
 for (echeance in echeances) {
   vol_tmp <- df %>%
@@ -134,4 +140,76 @@ for (echeance in echeances) {
   cat("\n\nVolatilité pour échéance:", echeance, "\n")
   print(vol_tmp)
 }
+```
+
+
+
+## MAY - OATS
+
+### Filtrage des contrats échéance MAY - OATS
+
+```{r filter-mai-oats}
+a2$Date <- as.Date(a2$Date)
+
+contracts_mai_oats <- a2 %>%
+  dplyr::filter(grepl("MAY", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(Date >= as.Date("1926-01-04"))
+```
+
+### Visualisation des prix de clôture - échéance MAY - OATS
+
+```{r graph-mai-oats}
+ggplot(contracts_mai_oats, aes(x = Date, y = CLOSE, color = ID)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme de l’avoine - Contrats échéance MAY (feuille 'New')",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - MAY - OATS
+
+```{r volatility-mai-oats}
+volatilite_mai_oats <- contracts_mai_oats %>%
+  group_by(ID) %>%
+  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
+  arrange(desc(Volatilite))
+
+print(volatilite_mai_oats)
+```
+
+## JULY - OATS
+
+### Filtrage des contrats échéance JULY - OATS
+
+```{r filter-july-oats}
+contracts_july_oats <- a2 %>%
+  dplyr::filter(grepl("JUL", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
+  dplyr::filter(Date >= as.Date("1926-01-04"))
+```
+
+### Visualisation des prix de clôture - échéance JULY - OATS
+
+```{r graph-july-oats}
+ggplot(subset(contracts_july_oats, !is.na(CLOSE)), aes(x = Date, y = CLOSE, color = ID)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prix à terme de l'avoine - Contrats échéance JULY (tous marchés)",
+       x = "Date", y = "Prix de clôture") +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme_minimal()
+```
+
+### Calcul de la volatilité simple par contrat - JULY - OATS
+
+```{r volatility-july-oats}
+volatilite_july_oats <- contracts_july_oats %>%
+  group_by(ID) %>%
+  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
+  arrange(desc(Volatilite))
+
+print(volatilite_july_oats)
 ```

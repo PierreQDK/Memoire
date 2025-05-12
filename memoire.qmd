@@ -1,5 +1,5 @@
 ---
-title: "Memoire"
+title: "prpre"
 format: html
 editor: visual
 ---
@@ -8,12 +8,13 @@ editor: visual
 
 ```{r setup, include=FALSE}
 # Chargement des librairies (comme dans ton script)
+# Chargement des librairies nécessaires
 library(tibble)
 library(plm)
 library(lmtest)
 library(ggplot2)
 library(haven)
-library("writexl")
+library(writexl)
 library(readxl)
 library(zoo)
 library(lubridate)
@@ -56,6 +57,18 @@ library(ineq)
 library(gglorenz)
 library(gridExtra)
 library(changepoint)
+library(openxlsx)
+library(outliers)
+library(corrplot)
+library(PerformanceAnalytics)
+
+# Autres librairies spécifiques
+library(sjPlot)
+library(FactoMineR)
+library(factoextra)
+library(reshape2)
+library(MASS)
+library(AER)
 ```
 
 # Fonction utilitaire pour transformer année/mois/jour en objet Date
@@ -79,6 +92,390 @@ a1$Date <- as.Date(as.character(a1$Date))  # Correction type date
 pdim(a1)
 ```
 
+
+# Statistiques descriptives
+## WHEAT - Chicago
+```{r}
+wheat_chicago <- a1 %>%
+  filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv), !is.na(Close))
+
+basicStats(as.numeric(wheat_chicago$Close))
+range(wheat_chicago$Date)
+
+```
+## WHEAT - Autres villes
+```{r}
+library(dplyr)
+library(fBasics)
+
+# Filtrer les contrats WHEAT hors Chicago
+wheat_autres <- a1 %>%
+  filter(grepl("WHEAT", Indiv), !grepl("CHI", Indiv), !is.na(Close))
+
+# Calcul des statistiques
+basicStats(as.numeric(wheat_autres$Close))
+
+```
+
+
+
+```{r}
+# Extraire les identifiants "autres" pour WHEAT et CORN
+autres_villes <- a1 %>%
+  filter(grepl("WHEAT|CORN", Indiv), !grepl("CHI", Indiv)) %>%
+  distinct(Indiv) %>%
+  arrange(Indiv)
+
+print(autres_villes)
+
+```
+
+## CORN - Chicago
+
+```{r}
+library(dplyr)
+library(fBasics)
+
+# Filtrer les contrats CORN à Chicago
+corn_chicago <- a1 %>%
+  filter(grepl("CORN", Indiv), grepl("CHI", Indiv), !is.na(Close))
+
+# Statistiques descriptives
+basicStats(as.numeric(corn_chicago$Close))
+
+```
+
+
+## CORN - Autres villes
+
+```{r}
+# Filtrer les contrats CORN hors Chicago
+corn_autres <- a1 %>%
+  filter(grepl("CORN", Indiv), !grepl("CHI", Indiv), !is.na(Close))
+
+# Statistiques descriptives
+basicStats(as.numeric(corn_autres$Close))
+
+```
+
+
+
+# Test atypique
+
+## Graphiques CORN
+
+```{r}
+# Extraction du data.frame simple
+a1_df <- as.data.frame(a1)
+
+# Filtrage des données CORN
+corn_filtered <- a1_df %>%
+  filter(!is.na(Close),
+         grepl("CORN", Indiv),
+         grepl("MAY|JULY", Indiv),
+         grepl("CHI|KC|STL", Indiv)) %>%
+  mutate(Ville = case_when(
+    grepl("CHI", Indiv) ~ "Chicago",
+    grepl("KC", Indiv) ~ "Kansas City",
+    grepl("STL", Indiv) ~ "Saint Louis"
+  ))
+
+# Boxplot pour CORN
+ggplot(corn_filtered, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+### Graphique CORN MAY
+
+```{r}
+# Boxplot pour CORN MAY
+corn_may <- corn_filtered %>%
+  filter(grepl("MAY", Indiv))
+
+ggplot(corn_may, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+### Graphique CORN JULY
+
+```{r}
+# Boxplot pour CORN JULY
+corn_july <- corn_filtered %>%
+  filter(grepl("JULY", Indiv))
+
+ggplot(corn_july, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+## Graphiques WHEAT 
+
+```{r}
+# Filtrage des données WHEAT
+wheat_filtered <- a1_df %>%
+  filter(!is.na(Close),
+         grepl("WHEAT", Indiv),
+         grepl("MAY|JULY", Indiv),
+         grepl("CHI|KC|STL", Indiv)) %>%
+  mutate(Ville = case_when(
+    grepl("CHI", Indiv) ~ "Chicago",
+    grepl("KC", Indiv) ~ "Kansas City",
+    grepl("STL", Indiv) ~ "Saint Louis"
+  ))
+
+# Boxplot global pour WHEAT MAY & JULY
+ggplot(wheat_filtered, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+
+## Graphique WHEAT May
+```{r}
+# Filtrage des données WHEAT
+wheat_filtered <- a1_df %>%
+  filter(!is.na(Close),
+         grepl("WHEAT", Indiv),
+         grepl("MAY|JULY", Indiv),
+         grepl("CHI|KC|STL", Indiv)) %>%
+  mutate(Ville = case_when(
+    grepl("CHI", Indiv) ~ "Chicago",
+    grepl("KC", Indiv) ~ "Kansas City",
+    grepl("STL", Indiv) ~ "Saint Louis"
+  ))
+
+# Boxplot pour WHEAT MAY
+wheat_may <- wheat_filtered %>%
+  filter(grepl("MAY", Indiv))
+
+ggplot(wheat_may, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+## Graphique WHEAT JULY
+
+```{r}
+# Boxplot pour WHEAT JULY
+wheat_july <- wheat_filtered %>%
+  filter(grepl("JULY", Indiv))
+
+ggplot(wheat_july, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill = Ville)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8) +
+  labs(
+    x = "Contrat à terme",
+    y = "Prix de clôture"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+## Tests statistiques des valeurs atypiques 
+
+```{r}
+# Fonction pour détecter les points atypiques avec la méthode IQR
+detect_outliers_iqr <- function(data, column_name) {
+  Q1 <- quantile(data[[column_name]], 0.25, na.rm = TRUE)
+  Q3 <- quantile(data[[column_name]], 0.75, na.rm = TRUE)
+  IQR_value <- Q3 - Q1
+
+  lower_bound <- Q1 - 1.5 * IQR_value
+  upper_bound <- Q3 + 1.5 * IQR_value
+
+  outliers <- data %>%
+    filter(data[[column_name]] < lower_bound | data[[column_name]] > upper_bound)
+  
+  return(outliers)
+}
+
+# Détecter les points atypiques dans les prix de clôture (Close) pour le maïs et le blé
+corn_outliers <- detect_outliers_iqr(a1, "Close")
+
+wheat_outliers <- detect_outliers_iqr(a1, "Close")
+
+# Affichage des résultats des points atypiques pour CORN et WHEAT
+
+print(corn_outliers)
+
+print(wheat_outliers)
+
+```
+
+
+
+```{r}
+
+
+# Appliquer le test de Rosner sur le prix de clôture (Close)
+res_close <- rosnerTest(a1$Close, k = 10, alpha = 0.05)  # k = 10 permet de tester jusqu'à 10 points atypiques
+
+# Affichage des résultats du test de Rosner pour "Close"
+cat("Résultats du test de Rosner pour le prix de clôture (Close): \n")
+print(res_close)
+
+```
+
+
+
+
+# ACF & PACF 
+
+## Graphique ACF
+```{r}
+# Corrélélogrammes avec acf()
+wheat_chicago <- a1 %>% filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv))
+corn_chicago  <- a1 %>% filter(grepl("CORN", Indiv), grepl("CHI", Indiv))
+
+# Prétraitement
+wheat_pre <- wheat_chicago %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
+corn_pre  <- corn_chicago  %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
+
+# Post-traitement
+wheat_post <- wheat_chicago %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
+corn_post  <- corn_chicago  %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
+
+# Afficher les ACF (20 lags)
+par(mfrow = c(2, 2))
+acf(wheat_pre$Close, main = "ACF – Chicago Wheat (pré 1926)", lag.max = 20)
+acf(wheat_post$Close, main = "ACF – Chicago Wheat (post 1926)", lag.max = 20)
+acf(corn_pre$Close, main = "ACF – Chicago Corn (pré 1926)", lag.max = 20)
+acf(corn_post$Close, main = "ACF – Chicago Corn (post 1926)", lag.max = 20)
+
+```
+
+
+
+
+# Estimation des tendances parraleles
+
+```{r}
+library(dplyr)
+library(broom)
+
+# ⚙️ Prétraitement des données
+a1_pre <- a1 %>%
+  filter(Date < as.Date("1926-02-01")) %>%
+  mutate(
+    time_to_treat = as.numeric(Date - as.Date("1925-01-01")),
+    Treatment = ifelse(grepl("CHI", Indiv), 1, 0)
+  )
+
+# 🟧 FONCTION de test des tendances parallèles
+test_parallel <- function(data, label) {
+  data <- data %>%
+    mutate(Interaction = Treatment * time_to_treat)
+
+  model <- lm(Close ~ time_to_treat + Treatment + Interaction, data = data)
+  result <- tidy(model) %>% filter(term == "Interaction")
+
+  if (nrow(result) == 0) return(NULL)
+
+  pval <- result$p.value
+  sig <- ifelse(pval < 0.01, "***", ifelse(pval < 0.05, "**", ifelse(pval < 0.1, "*", "")))
+
+  tibble(
+    Commodity = label,
+    coef = round(result$estimate, 3),
+    p_value = round(pval, 3),
+    stars = sig
+  )
+}
+
+# 🔹 Test pour le CORN
+corn_data <- a1_pre %>% filter(grepl("CORN", Indiv, ignore.case = TRUE))
+res_corn <- test_parallel(corn_data, "CORN")
+
+# 🔹 Test pour le WHEAT
+wheat_data <- a1_pre %>% filter(grepl("WHEAT", Indiv, ignore.case = TRUE))
+res_wheat <- test_parallel(wheat_data, "WHEAT")
+
+# 📊 Résultat global
+test_parallel_results <- bind_rows(res_corn, res_wheat)
+print(test_parallel_results)
+
+```
+
+il n’y a pas de différence significative dans les tendances pré-traitement entre le groupe traité et les autres.
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# 🔹 Étape 1 : filtrer période pré-traitement
+a1_pre <- a1 %>%
+  filter(Date < as.Date("1926-02-01")) %>%
+  mutate(
+    Treatment = ifelse(grepl("CHI", Indiv), "Chicago", "Autres"),
+    Commodity = case_when(
+      grepl("CORN", Indiv, ignore.case = TRUE) ~ "CORN",
+      grepl("WHEAT", Indiv, ignore.case = TRUE) ~ "WHEAT",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(Commodity))
+
+# 🔹 Étape 2 : moyenne par Date et groupe
+pretrend_summary <- a1_pre %>%
+  group_by(Date, Treatment, Commodity) %>%
+  summarise(mean_price = mean(Close, na.rm = TRUE), .groups = "drop")
+
+# 🔹 Étape 3 : graphique pour le CORN
+ggplot(pretrend_summary %>% filter(Commodity == "CORN"),
+       aes(x = Date, y = mean_price, color = Treatment)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Tendances pré-traitement - CORN",
+       subtitle = "Chicago vs autres marchés",
+       x = "Date", y = "Prix moyen de clôture") +
+  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# 🔹 Étape 4 : graphique pour le WHEAT
+ggplot(pretrend_summary %>% filter(Commodity == "WHEAT"),
+       aes(x = Date, y = mean_price, color = Treatment)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Tendances pré-traitement - WHEAT",
+       subtitle = "Chicago vs autres marchés",
+       x = "Date", y = "Prix moyen de clôture") +
+  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
 # GRAPHIQUE DE CHAQUE MATIÈRE PREMIÈRE ET VOLATILITÉS
 
 ## MAY
@@ -213,245 +610,6 @@ vol_july <- contracts_july %>%
 print(vol_july)
 ```
 
-## SEPTEMBER
-
-### Filtrage des contrats échéance SEPTEMBER (blé et maïs)
-
-```{r filter-september}
-contracts_sep <- a1[grepl("SEPTEMBER", a1$Indiv), ]
-contracts_sep_wheat <- contracts_sep[grepl("WHEAT", contracts_sep$Indiv), ]
-contracts_sep_corn <- contracts_sep[grepl("CORN", contracts_sep$Indiv), ]
-```
-
-### Visualisation des prix de clôture - échéance SEPTEMBER - WHEAT
-
-```{r graph-sep-wheat}
-ggplot(subset(contracts_sep_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du blé - Contrats échéance SEPTEMBER (tous marchés)",
-       x = "Date", y = "Prix de clôture") +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
-  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
-  theme_minimal()
-```
-
-### Visualisation des prix de clôture - échéance SEPTEMBER - CORN
-
-```{r graph-sep-corn}
-ggplot(subset(contracts_sep_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du maïs - Contrats échéance SEPTEMBER (tous marchés)",
-       x = "Date", y = "Prix de clôture") +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
-  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
-  theme_minimal()
-```
-
-### Calcul de la volatilité simple par contrat - SEPTEMBER
-
-```{r volatility-september}
-vol_sep <- contracts_sep %>%
-  group_by(Indiv) %>%
-  summarise(volatilite = sd(Close, na.rm = TRUE))
-print(vol_sep)
-```
-
-## IMPORT ET PRÉPARATION DES DONNÉES OATS
-
-### Chargement et nettoyage de la feuille "New"
-
-```{r import-oats}
-a2 <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "New")
-#view(a2)
-
-a2 <- a2 %>%
-  dplyr::filter(!is.na(Year) & !is.na(Month) & !is.na(Day)) %>%
-  mutate(
-    Date = as.Date(ISOdate(Year, Month, Day)),
-    CLOSE = as.numeric(CLOSE),
-    Treatment = ifelse(grepl("^CHI-", ID), 1, 0),
-    Post = ifelse(Date >= as.Date("1926-02-01"), 1, 0),
-    Treat_Post = Treatment * Post
-  ) %>%
-  dplyr::filter(!is.na(CLOSE)) # ✅ uniquement supprimer les lignes où CLOSE est NA
-
-# Créer un panel sans rien trier
-a2 <- pdata.frame(a2, index = c("ID", "Date"))
-```
-
-## MAY - OATS
-
-### Filtrage des contrats échéance MAY - OATS
-
-```{r filter-mai-oats}
-a2$Date <- as.Date(a2$Date)
-
-contracts_mai_oats <- a2 %>%
-  dplyr::filter(grepl("MAY", ID, ignore.case = TRUE)) %>%
-  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
-  dplyr::filter(Date >= as.Date("1926-01-04"))
-```
-
-### Visualisation des prix de clôture - échéance MAY - OATS
-
-```{r graph-mai-oats}
-ggplot(contracts_mai_oats, aes(x = Date, y = CLOSE, color = ID)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Prix à terme de l’avoine - Contrats échéance MAY (feuille 'New')",
-       x = "Date", y = "Prix de clôture") +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
-  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
-  theme_minimal()
-```
-
-### Calcul de la volatilité simple par contrat - MAY - OATS
-
-```{r volatility-mai-oats}
-volatilite_mai_oats <- contracts_mai_oats %>%
-  group_by(ID) %>%
-  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
-  arrange(desc(Volatilite))
-
-print(volatilite_mai_oats)
-```
-
-## JULY - OATS
-
-### Filtrage des contrats échéance JULY - OATS
-
-```{r filter-july-oats}
-contracts_july_oats <- a2 %>%
-  dplyr::filter(grepl("JUL", ID, ignore.case = TRUE)) %>%
-  dplyr::filter(grepl("OATS", ID, ignore.case = TRUE)) %>%
-  dplyr::filter(Date >= as.Date("1926-01-04"))
-```
-
-### Visualisation des prix de clôture - échéance JULY - OATS
-
-```{r graph-july-oats}
-ggplot(subset(contracts_july_oats, !is.na(CLOSE)), aes(x = Date, y = CLOSE, color = ID)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Prix à terme de l'avoine - Contrats échéance JULY (tous marchés)",
-       x = "Date", y = "Prix de clôture") +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
-  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
-  theme_minimal()
-```
-
-### Calcul de la volatilité simple par contrat - JULY - OATS
-
-```{r volatility-july-oats}
-volatilite_july_oats <- contracts_july_oats %>%
-  group_by(ID) %>%
-  summarise(Volatilite = sd(CLOSE, na.rm = TRUE), N = n()) %>%
-  arrange(desc(Volatilite))
-
-print(volatilite_july_oats)
-```
-
-------------------------------------------------------------------------
-
-# Estimation des tendances parraleles
-
-```{r}
-library(dplyr)
-library(broom)
-
-# ⚙️ Prétraitement des données
-a1_pre <- a1 %>%
-  filter(Date < as.Date("1926-02-01")) %>%
-  mutate(
-    time_to_treat = as.numeric(Date - as.Date("1925-01-01")),
-    Treatment = ifelse(grepl("CHI", Indiv), 1, 0)
-  )
-
-# 🟧 FONCTION de test des tendances parallèles
-test_parallel <- function(data, label) {
-  data <- data %>%
-    mutate(Interaction = Treatment * time_to_treat)
-
-  model <- lm(Close ~ time_to_treat + Treatment + Interaction, data = data)
-  result <- tidy(model) %>% filter(term == "Interaction")
-
-  if (nrow(result) == 0) return(NULL)
-
-  pval <- result$p.value
-  sig <- ifelse(pval < 0.01, "***", ifelse(pval < 0.05, "**", ifelse(pval < 0.1, "*", "")))
-
-  tibble(
-    Commodity = label,
-    coef = round(result$estimate, 3),
-    p_value = round(pval, 3),
-    stars = sig
-  )
-}
-
-# 🔹 Test pour le CORN
-corn_data <- a1_pre %>% filter(grepl("CORN", Indiv, ignore.case = TRUE))
-res_corn <- test_parallel(corn_data, "CORN")
-
-# 🔹 Test pour le WHEAT
-wheat_data <- a1_pre %>% filter(grepl("WHEAT", Indiv, ignore.case = TRUE))
-res_wheat <- test_parallel(wheat_data, "WHEAT")
-
-# 📊 Résultat global
-test_parallel_results <- bind_rows(res_corn, res_wheat)
-print(test_parallel_results)
-
-```
-
-il n’y a pas de différence significative dans les tendances pré-traitement entre le groupe traité et les autres.
-
-
-```{r}
-library(dplyr)
-library(ggplot2)
-
-# 🔹 Étape 1 : filtrer période pré-traitement
-a1_pre <- a1 %>%
-  filter(Date < as.Date("1926-02-01")) %>%
-  mutate(
-    Treatment = ifelse(grepl("CHI", Indiv), "Chicago", "Autres"),
-    Commodity = case_when(
-      grepl("CORN", Indiv, ignore.case = TRUE) ~ "CORN",
-      grepl("WHEAT", Indiv, ignore.case = TRUE) ~ "WHEAT",
-      TRUE ~ NA_character_
-    )
-  ) %>%
-  filter(!is.na(Commodity))
-
-# 🔹 Étape 2 : moyenne par Date et groupe
-pretrend_summary <- a1_pre %>%
-  group_by(Date, Treatment, Commodity) %>%
-  summarise(mean_price = mean(Close, na.rm = TRUE), .groups = "drop")
-
-# 🔹 Étape 3 : graphique pour le CORN
-ggplot(pretrend_summary %>% filter(Commodity == "CORN"),
-       aes(x = Date, y = mean_price, color = Treatment)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Tendances pré-traitement - CORN",
-       subtitle = "Chicago vs autres marchés",
-       x = "Date", y = "Prix moyen de clôture") +
-  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
-  theme_minimal() +
-  theme(legend.position = "top")
-
-# 🔹 Étape 4 : graphique pour le WHEAT
-ggplot(pretrend_summary %>% filter(Commodity == "WHEAT"),
-       aes(x = Date, y = mean_price, color = Treatment)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Tendances pré-traitement - WHEAT",
-       subtitle = "Chicago vs autres marchés",
-       x = "Date", y = "Prix moyen de clôture") +
-  scale_color_manual(values = c("Chicago" = "darkred", "Autres" = "steelblue")) +
-  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
-  theme_minimal() +
-  theme(legend.position = "top")
-
-```
-
-Confirme l'interprétation au dessus 
 
 # DID
 
@@ -610,96 +768,4 @@ print(results_novation)
 
 
 
-# ACF & PACF 
-
-```{r}
-library(dplyr)
-library(ggplot2)
-
-# Corrélélogrammes avec acf()
-wheat_chicago <- a1 %>% filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv))
-corn_chicago  <- a1 %>% filter(grepl("CORN", Indiv), grepl("CHI", Indiv))
-
-# Prétraitement
-wheat_pre <- wheat_chicago %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
-corn_pre  <- corn_chicago  %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
-
-# Post-traitement
-wheat_post <- wheat_chicago %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
-corn_post  <- corn_chicago  %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
-
-# Afficher les ACF (20 lags)
-par(mfrow = c(2, 2))
-acf(wheat_pre$Close, main = "ACF – Chicago Wheat (pré 1926)", lag.max = 20)
-acf(wheat_post$Close, main = "ACF – Chicago Wheat (post 1926)", lag.max = 20)
-acf(corn_pre$Close, main = "ACF – Chicago Corn (pré 1926)", lag.max = 20)
-acf(corn_post$Close, main = "ACF – Chicago Corn (post 1926)", lag.max = 20)
-
-```
-
-
-# Statistiques descriptives
-## WHEAT - Chicago
-```{r}
-wheat_chicago <- a1 %>%
-  filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv), !is.na(Close))
-
-basicStats(as.numeric(wheat_chicago$Close))
-range(wheat_chicago$Date)
-
-```
-## WHEAT - Autres villes
-```{r}
-library(dplyr)
-library(fBasics)
-
-# Filtrer les contrats WHEAT hors Chicago
-wheat_autres <- a1 %>%
-  filter(grepl("WHEAT", Indiv), !grepl("CHI", Indiv), !is.na(Close))
-
-# Calcul des statistiques
-basicStats(as.numeric(wheat_autres$Close))
-
-```
-
-
-
-```{r}
-# Extraire les identifiants "autres" pour WHEAT et CORN
-autres_villes <- a1 %>%
-  filter(grepl("WHEAT|CORN", Indiv), !grepl("CHI", Indiv)) %>%
-  distinct(Indiv) %>%
-  arrange(Indiv)
-
-print(autres_villes)
-
-```
-
-## CORN - Chicago
-
-```{r}
-library(dplyr)
-library(fBasics)
-
-# Filtrer les contrats CORN à Chicago
-corn_chicago <- a1 %>%
-  filter(grepl("CORN", Indiv), grepl("CHI", Indiv), !is.na(Close))
-
-# Statistiques descriptives
-basicStats(as.numeric(corn_chicago$Close))
-
-```
-
-
-## CORN - Autres villes
-
-```{r}
-# Filtrer les contrats CORN hors Chicago
-corn_autres <- a1 %>%
-  filter(grepl("CORN", Indiv), !grepl("CHI", Indiv), !is.na(Close))
-
-# Statistiques descriptives
-basicStats(as.numeric(corn_autres$Close))
-
-```
 
