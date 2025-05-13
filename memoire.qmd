@@ -10,6 +10,7 @@ editor: visual
 # Chargement des librairies (comme dans ton script)
 # Chargement des librairies nécessaires
 library(tibble)
+library(fBasics)
 library(plm)
 library(lmtest)
 library(ggplot2)
@@ -301,41 +302,14 @@ ggplot(wheat_july, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill 
 
 ```
 
-## Tests statistiques des valeurs atypiques 
-
-```{r}
-# Fonction pour détecter les points atypiques avec la méthode IQR
-detect_outliers_iqr <- function(data, column_name) {
-  Q1 <- quantile(data[[column_name]], 0.25, na.rm = TRUE)
-  Q3 <- quantile(data[[column_name]], 0.75, na.rm = TRUE)
-  IQR_value <- Q3 - Q1
-
-  lower_bound <- Q1 - 1.5 * IQR_value
-  upper_bound <- Q3 + 1.5 * IQR_value
-
-  outliers <- data %>%
-    filter(data[[column_name]] < lower_bound | data[[column_name]] > upper_bound)
-  
-  return(outliers)
-}
-
-# Détecter les points atypiques dans les prix de clôture (Close) pour le maïs et le blé
-corn_outliers <- detect_outliers_iqr(a1, "Close")
-
-wheat_outliers <- detect_outliers_iqr(a1, "Close")
-
-# Affichage des résultats des points atypiques pour CORN et WHEAT
-
-print(corn_outliers)
-
-print(wheat_outliers)
-
-```
-
+## Tests statistiques des valeurs atypiques avec Rosner Test
 
 
 ```{r}
-
+# Charger le package
+library(outliers)
+library(DescTools)
+library(EnvStats)
 
 # Appliquer le test de Rosner sur le prix de clôture (Close)
 res_close <- rosnerTest(a1$Close, k = 10, alpha = 0.05)  # k = 10 permet de tester jusqu'à 10 points atypiques
@@ -345,7 +319,6 @@ cat("Résultats du test de Rosner pour le prix de clôture (Close): \n")
 print(res_close)
 
 ```
-
 
 
 
@@ -762,6 +735,10 @@ results_novation <- bind_rows(
 
 # 🖥️ Affichage
 print(results_novation)
+
+```
+
+```{r}
 
 ```
 
