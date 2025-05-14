@@ -449,6 +449,7 @@ ggplot(pretrend_summary %>% filter(Commodity == "WHEAT"),
   theme(legend.position = "top")
 
 ```
+
 # GRAPHIQUE DE CHAQUE MATIÈRE PREMIÈRE ET VOLATILITÉS
 
 ## MAY
@@ -466,7 +467,7 @@ contracts_mai_corn <- contracts_mai[grepl("CORN", contracts_mai$Indiv), ]
 ```{r graph-mai-wheat}
 ggplot(subset(contracts_mai_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du blé - Contrats échéance MAY (tous marchés)",
+  labs(,
        x = "Date", y = "Prix de clôture") +
   geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
@@ -478,7 +479,7 @@ ggplot(subset(contracts_mai_wheat, !is.na(Close)), aes(x = Date, y = Close, colo
 ```{r graph-mai-corn}
 ggplot(subset(contracts_mai_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du maïs - Contrats échéance MAY (tous marchés)",
+  labs(
        x = "Date", y = "Prix de clôture") +
   geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
@@ -508,14 +509,61 @@ ggplot(mean_did_mai, aes(x = Période, y = Prix_moyen, group = Groupe, color = G
   theme_minimal()
 ```
 
+```{r}
+# Calcul de la différence avant/après pour chaque groupe
+mean_did_mai_diff <- mean_did_mai %>%
+  spread(Période, Prix_moyen) %>%
+  mutate(Différence = Après - Avant)
+
+# Création du graphique avec la différence avant-après affichée
+ggplot(mean_did_mai, aes(x = Période, y = Prix_moyen, group = Groupe, color = Groupe)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 3) +
+  labs(title = "Effet estimé de la novation (DiD) - Contrats MAY",
+       x = "Période", y = "Prix moyen") +
+  theme_minimal() +
+  # Ajout de la différence avant/après sur le graphique
+  geom_text(data = mean_did_mai_diff, 
+            aes(x = 1.5, y = max(mean_did_mai$Prix_moyen), 
+                label = paste("Différence:", round(Différence, 2))),
+            hjust = 0, color = "black", size = 5)
+
+```
+
+
+
+
+
+
 ### Calcul de la volatilité simple par contrat - MAY
 
-```{r volatility-mai}
-vol_ma <- contracts_mai %>%
-  group_by(Indiv) %>%
-  summarise(volatilite = sd(Close, na.rm = TRUE))
-print(vol_ma)
+```{r}
+library(dplyr)
+
+# Filtrer les données pour les contrats MAY
+contracts_mai <- a1[grepl("MAY", a1$Indiv), ]
+
+# Calculer la volatilité avant et après la réforme pour les contrats MAY
+vol_mai <- contracts_mai %>%
+  mutate(Période = ifelse(Date < as.Date("1926-02-01"), "Avant", "Après")) %>%
+  group_by(Indiv, Période) %>%
+  summarise(volatilite = sd(Close, na.rm = TRUE), .groups = "drop")
+
+# Afficher la volatilité avant et après pour les contrats MAY
+print(vol_mai)
+
+# Calculer la différence de volatilité avant et après pour chaque contrat
+vol_diff_mai <- vol_mai %>%
+  spread(key = Période, value = volatilite) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Afficher la différence de volatilité
+print(vol_diff_mai)
+
 ```
+
+
+
 
 ## JULY
 
@@ -532,7 +580,7 @@ contracts_july_corn <- contracts_july[grepl("CORN", contracts_july$Indiv), ]
 ```{r graph-july-wheat}
 ggplot(subset(contracts_july_wheat, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du blé - Contrats échéance JULY (tous marchés)",
+  labs(
        x = "Date", y = "Prix de clôture") +
   geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
@@ -544,7 +592,7 @@ ggplot(subset(contracts_july_wheat, !is.na(Close)), aes(x = Date, y = Close, col
 ```{r graph-july-corn}
 ggplot(subset(contracts_july_corn, !is.na(Close)), aes(x = Date, y = Close, color = Indiv)) +
   geom_line(linewidth = 1) +
-  labs(title = "Prix à terme du maïs - Contrats échéance JULY (tous marchés)",
+  labs(
        x = "Date", y = "Prix de clôture") +
   geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed") +
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
@@ -574,14 +622,82 @@ ggplot(mean_did_july, aes(x = Période, y = Prix_moyen, group = Groupe, color = 
   theme_minimal()
 ```
 
+
 ### Calcul de la volatilité simple par contrat - JULY
 
-```{r volatility-july}
+```{r}
+# Filtrer les contrats échéance JULY (blé et maïs)
+contracts_july <- a1[grepl("JULY", a1$Indiv), ]
+
+# Diviser les contrats de juillet pour le blé et le maïs
+contracts_july_wheat <- contracts_july[grepl("WHEAT", contracts_july$Indiv), ]
+contracts_july_corn <- contracts_july[grepl("CORN", contracts_july$Indiv), ]
+
+
+# Calcul de la volatilité avant et après la réforme pour les contrats JULY
 vol_july <- contracts_july %>%
-  group_by(Indiv) %>%
-  summarise(volatilite = sd(Close, na.rm = TRUE))
+  mutate(Période = ifelse(Date < as.Date("1926-02-01"), "Avant", "Après")) %>%
+  group_by(Indiv, Période) %>%
+  summarise(volatilite = sd(Close, na.rm = TRUE), .groups = "drop")
+
+# Afficher la volatilité avant et après pour les contrats JULY
 print(vol_july)
+
+# Calculer la différence de volatilité avant et après pour chaque contrat JULY
+vol_diff_july <- vol_july %>%
+  spread(key = Période, value = volatilite) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Afficher la différence de volatilité
+print(vol_diff_july)
+
+
 ```
+
+
+## Volatilité générale avant et après la réforme pour chaque ville (Chicago, Kansas City, St. Louis) et pour MAY et JULY
+```{r}
+# Filtrer les contrats échéance MAY et JULY (blé et maïs) pour chaque ville
+contracts_may_july <- a1[grepl("MAY|JULY", a1$Indiv), ]
+
+# Ajouter une colonne pour la période (avant et après la novation)
+contracts_may_july <- contracts_may_july %>%
+  mutate(Période = ifelse(Date < as.Date("1926-02-01"), "Avant", "Après"),
+         Ville = case_when(
+           grepl("CHI", Indiv) ~ "Chicago",
+           grepl("KC", Indiv) ~ "Kansas City",
+           grepl("STL", Indiv) ~ "St. Louis"
+         ))
+
+# Calculer la volatilité générale avant et après la réforme pour chaque ville (Chicago, Kansas City, St. Louis)
+volatilite_generale_may_july_villes <- contracts_may_july %>%
+  group_by(Ville, Période) %>%
+  summarise(volatilite_totale = sd(Close, na.rm = TRUE), .groups = "drop")
+
+# Afficher la volatilité générale avant et après pour chaque ville (Chicago, Kansas City, St. Louis) et pour MAY et JULY
+print(volatilite_generale_may_july_villes)
+
+volatilite_generale_may_july_villes <- contracts_may_july %>%
+  group_by(Ville, Période) %>%
+  summarise(volatilite_totale = sd(Close, na.rm = TRUE), .groups = "drop")
+
+# Utiliser spread pour organiser les données par période
+vol_diff_may_july <- volatilite_generale_may_july_villes %>%
+  spread(key = Période, value = volatilite_totale) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Afficher la différence de volatilité générale
+print(vol_diff_may_july)
+
+```
+
+
+
+
+
+
+
+
 
 
 # DID
@@ -654,7 +770,83 @@ print(results_did)
 
 ```
 
-## Grapgqiue 
+
+# Spreads
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# Filtrage des contrats MAY et JULY
+contracts_may_july <- a1[grepl("MAY|JULY", a1$Indiv), ]
+
+# Création de la variable de période (avant et après novation)
+contracts_may_july <- contracts_may_july %>%
+  mutate(Période = ifelse(Date < as.Date("1926-02-01"), "Avant", "Après"),
+         Ville = case_when(
+           grepl("CHI", Indiv) ~ "Chicago",
+           grepl("KC", Indiv) ~ "Kansas City",
+           grepl("STL", Indiv) ~ "St. Louis"
+         ))
+
+# Extraire les prix de Chicago
+chicago_prices <- contracts_may_july %>%
+  filter(grepl("CHI", Indiv)) %>%
+  dplyr::select(Date, Close) %>%
+  rename(Chicago_Price = Close)  # Renommer la colonne pour faciliter la fusion
+
+# Joindre les prix de Chicago avec les autres villes pour calculer le spread
+contracts_may_july <- contracts_may_july %>%
+  left_join(chicago_prices, by = "Date")
+
+# Calcul du spread pour chaque ligne en utilisant les prix de Chicago
+contracts_may_july <- contracts_may_july %>%
+  mutate(Spread = Close - Chicago_Price)
+
+# Calcul de la moyenne des spreads avant et après la réforme pour chaque mois
+spread_avg_may <- contracts_may_july %>%
+  filter(grepl("MAY", Indiv)) %>%
+  group_by(Ville, Période) %>%
+  summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
+
+spread_avg_july <- contracts_may_july %>%
+  filter(grepl("JULY", Indiv)) %>%
+  group_by(Ville, Période) %>%
+  summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
+
+# Calcul de la différence des spreads pour Mai
+spread_diff_may <- spread_avg_may %>%
+  spread(key = Période, value = Spread_Moyenne) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Calcul de la différence des spreads pour Juillet
+spread_diff_july <- spread_avg_july %>%
+  spread(key = Période, value = Spread_Moyenne) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Calcul des résultats généraux (pour toutes les villes)
+spread_avg_general <- contracts_may_july %>%
+  group_by(Ville, Période) %>%
+  summarise(Spread_Moyenne_Gen = mean(Spread, na.rm = TRUE), .groups = "drop")
+
+# Calcul de la différence des spreads généraux
+spread_diff_general <- spread_avg_general %>%
+  spread(key = Période, value = Spread_Moyenne_Gen) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Affichage des résultats pour Mai et Juillet
+cat("Résultats pour Mai :\n")
+print(spread_diff_may)
+
+cat("\nRésultats pour Juillet :\n")
+print(spread_diff_july)
+
+cat("\nRésultats Généraux :\n")
+print(spread_diff_general)
+
+```
 
 
 
@@ -662,7 +854,7 @@ print(results_did)
 
 
 
-
+# A FDAIEREE A LA FN
 
 # receipts and shipment
 
