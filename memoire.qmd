@@ -4,19 +4,24 @@ format: html
 editor: visual
 ---
 
-# Chargement des librairies nécessaires pour l'analyse
+# CHARGEMENT DES LIBRAIRIES
 
 ```{r setup, include=FALSE}
 # Chargement des librairies (comme dans ton script)
 # Chargement des librairies nécessaires
 library(tibble)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(outliers)
+library(DescTools)
+library(EnvStats)
 library(fBasics)
 library(plm)
 library(lmtest)
-library(ggplot2)
 library(haven)
 library(writexl)
-library(readxl)
 library(zoo)
 library(lubridate)
 library(clubSandwich)
@@ -50,7 +55,6 @@ library(naniar)
 library(scales)
 library(mgcv)
 library(e1071)
-library(dplyr)
 library(roll)
 library(EnvCpt)
 library(viridis)
@@ -59,11 +63,8 @@ library(gglorenz)
 library(gridExtra)
 library(changepoint)
 library(openxlsx)
-library(outliers)
 library(corrplot)
 library(PerformanceAnalytics)
-
-# Autres librairies spécifiques
 library(sjPlot)
 library(FactoMineR)
 library(factoextra)
@@ -72,7 +73,7 @@ library(MASS)
 library(AER)
 ```
 
-# Fonction utilitaire pour transformer année/mois/jour en objet Date
+# TRANSFORMATION DE DATE
 
 ```{r date-fn}
 toDate <- function(year, month, day) {
@@ -80,7 +81,7 @@ toDate <- function(year, month, day) {
 }
 ```
 
-# Import et nettoyage de la feuille 'panel7' (calcul des variables traitement, post, interaction)
+# IMPORT ET NETTOYAGE DES DONNÉES 
 
 ```{r import-clean}
 a1 <- read_excel("daily_futures_prices_1920s.xlsx", sheet = "panel7")
@@ -94,7 +95,7 @@ pdim(a1)
 ```
 
 
-# Statistiques descriptives
+# STATISTIQUES DESCRIPTIVES
 ## WHEAT - Chicago
 ```{r}
 wheat_chicago <- a1 %>%
@@ -161,7 +162,7 @@ basicStats(as.numeric(corn_autres$Close))
 
 
 
-# Test atypique
+# TEST DES VALEURS ATYPIQUES
 
 ## Graphiques CORN
 
@@ -306,10 +307,6 @@ ggplot(wheat_july, aes(x = reorder(Indiv, Close, FUN = median), y = Close, fill 
 
 
 ```{r}
-# Charger le package
-library(outliers)
-library(DescTools)
-library(EnvStats)
 
 # Appliquer le test de Rosner sur le prix de clôture (Close)
 res_close <- rosnerTest(a1$Close, k = 10, alpha = 0.05)  # k = 10 permet de tester jusqu'à 10 points atypiques
@@ -322,39 +319,15 @@ print(res_close)
 
 
 
-# ACF & PACF 
 
-## Graphique ACF
+
+
+# ESTIMATION DES TENDANCES PARALLÈLES
+
+
+## Test statistique des tendances parallèles
 ```{r}
-# Corrélélogrammes avec acf()
-wheat_chicago <- a1 %>% filter(grepl("WHEAT", Indiv), grepl("CHI", Indiv))
-corn_chicago  <- a1 %>% filter(grepl("CORN", Indiv), grepl("CHI", Indiv))
 
-# Prétraitement
-wheat_pre <- wheat_chicago %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
-corn_pre  <- corn_chicago  %>% filter(Date < as.Date("1926-02-01")) %>% filter(!is.na(Close))
-
-# Post-traitement
-wheat_post <- wheat_chicago %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
-corn_post  <- corn_chicago  %>% filter(Date >= as.Date("1926-02-01")) %>% filter(!is.na(Close))
-
-# Afficher les ACF (20 lags)
-par(mfrow = c(2, 2))
-acf(wheat_pre$Close, main = "ACF – Chicago Wheat (pré 1926)", lag.max = 20)
-acf(wheat_post$Close, main = "ACF – Chicago Wheat (post 1926)", lag.max = 20)
-acf(corn_pre$Close, main = "ACF – Chicago Corn (pré 1926)", lag.max = 20)
-acf(corn_post$Close, main = "ACF – Chicago Corn (post 1926)", lag.max = 20)
-
-```
-
-
-
-
-# Estimation des tendances parraleles
-
-```{r}
-library(dplyr)
-library(broom)
 
 # ⚙️ Prétraitement des données
 a1_pre <- a1 %>%
@@ -401,10 +374,9 @@ print(test_parallel_results)
 
 il n’y a pas de différence significative dans les tendances pré-traitement entre le groupe traité et les autres.
 
-
+## Représentation graphique des tendances pré-traitement
 ```{r}
-library(dplyr)
-library(ggplot2)
+
 
 # 🔹 Étape 1 : filtrer période pré-traitement
 a1_pre <- a1 %>%
@@ -485,51 +457,6 @@ ggplot(subset(contracts_mai_corn, !is.na(Close)), aes(x = Date, y = Close, color
   scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
   theme_minimal()
 ```
-
-### Visualisation graphique de l'effet DiD estimé - échéance MAY
-
-```{r graph-did-mai}
-a1_did_sample_mai <- rbind(
-  a1[grepl("CHI-WHEAT-MAY", a1$Indiv), ],
-  a1[grepl("KC_WHEAT_MAY|STL-WHEAT-MAY", a1$Indiv), ]
-)
-a1_did_sample_mai <- a1_did_sample_mai %>%
-  mutate(Groupe = ifelse(grepl("CHI", Indiv), "Treated", "Control"),
-         Période = factor(ifelse(as.Date(Date) >= as.Date("1926-02-01"), "Après", "Avant"), levels = c("Avant", "Après")))
-
-mean_did_mai <- a1_did_sample_mai %>%
-  group_by(Groupe, Période) %>%
-  summarise(Prix_moyen = mean(Close, na.rm = TRUE), .groups = "drop")
-
-ggplot(mean_did_mai, aes(x = Période, y = Prix_moyen, group = Groupe, color = Groupe)) +
-  geom_line(linewidth = 1.5) +
-  geom_point(size = 3) +
-  labs(title = "Effet estimé de la novation (DiD) - Contrats MAY",
-       x = "Période", y = "Prix moyen") +
-  theme_minimal()
-```
-
-```{r}
-# Calcul de la différence avant/après pour chaque groupe
-mean_did_mai_diff <- mean_did_mai %>%
-  spread(Période, Prix_moyen) %>%
-  mutate(Différence = Après - Avant)
-
-# Création du graphique avec la différence avant-après affichée
-ggplot(mean_did_mai, aes(x = Période, y = Prix_moyen, group = Groupe, color = Groupe)) +
-  geom_line(linewidth = 1.5) +
-  geom_point(size = 3) +
-  labs(title = "Effet estimé de la novation (DiD) - Contrats MAY",
-       x = "Période", y = "Prix moyen") +
-  theme_minimal() +
-  # Ajout de la différence avant/après sur le graphique
-  geom_text(data = mean_did_mai_diff, 
-            aes(x = 1.5, y = max(mean_did_mai$Prix_moyen), 
-                label = paste("Différence:", round(Différence, 2))),
-            hjust = 0, color = "black", size = 5)
-
-```
-
 
 
 
@@ -694,13 +621,7 @@ print(vol_diff_may_july)
 
 
 
-
-
-
-
-
-
-# DID
+# DIFFERENCES-EN-DIFFERENCES (DID)
 
 ```{r}
 # Fonction pour exécuter un modèle DiD TWFE avec erreurs standards Driscoll-Kraay
@@ -771,15 +692,11 @@ print(results_did)
 ```
 
 
-# Spreads
-
-
+# SPREAD
 
 ```{r}
-library(dplyr)
-library(tidyr)
 
-# Filtrage des contrats MAY et JULY
+# Filtrage des contrats pour Mai et Juillet
 contracts_may_july <- a1[grepl("MAY|JULY", a1$Indiv), ]
 
 # Création de la variable de période (avant et après novation)
@@ -789,13 +706,17 @@ contracts_may_july <- contracts_may_july %>%
            grepl("CHI", Indiv) ~ "Chicago",
            grepl("KC", Indiv) ~ "Kansas City",
            grepl("STL", Indiv) ~ "St. Louis"
+         ),
+         Céréale = case_when(
+           grepl("CORN", Indiv) ~ "Maïs",  # Si le contrat contient "CORN", il s'agit de maïs
+           grepl("WHEAT", Indiv) ~ "Blé"   # Si le contrat contient "WHEAT", il s'agit de blé
          ))
 
 # Extraire les prix de Chicago
 chicago_prices <- contracts_may_july %>%
   filter(grepl("CHI", Indiv)) %>%
   dplyr::select(Date, Close) %>%
-  rename(Chicago_Price = Close)  # Renommer la colonne pour faciliter la fusion
+  rename(Chicago_Price = Close)
 
 # Joindre les prix de Chicago avec les autres villes pour calculer le spread
 contracts_may_july <- contracts_may_july %>%
@@ -805,28 +726,100 @@ contracts_may_july <- contracts_may_july %>%
 contracts_may_july <- contracts_may_july %>%
   mutate(Spread = Close - Chicago_Price)
 
-# Calcul de la moyenne des spreads avant et après la réforme pour chaque mois
-spread_avg_may <- contracts_may_july %>%
-  filter(grepl("MAY", Indiv)) %>%
+```
+
+
+## May
+
+### Blé
+
+```{r}
+# Calcul de la moyenne des spreads avant et après la réforme pour Mai, Blé
+spread_avg_may_wheat <- contracts_may_july %>%
+  filter(grepl("MAY", Indiv), Céréale == "Blé") %>%
   group_by(Ville, Période) %>%
   summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
 
-spread_avg_july <- contracts_may_july %>%
-  filter(grepl("JULY", Indiv)) %>%
+# Calcul de la différence des spreads pour Mai, Blé
+spread_diff_may_wheat <- spread_avg_may_wheat %>%
+  spread(key = Période, value = Spread_Moyenne) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Affichage des résultats
+cat("\nRésultats pour Mai - Blé :\n")
+print(spread_diff_may_wheat)
+
+```
+
+
+### Maïs
+
+```{r}
+# Calcul de la moyenne des spreads avant et après la réforme pour Mai, Maïs
+spread_avg_may_maize <- contracts_may_july %>%
+  filter(grepl("MAY", Indiv), Céréale == "Maïs") %>%
   group_by(Ville, Période) %>%
   summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
 
-# Calcul de la différence des spreads pour Mai
-spread_diff_may <- spread_avg_may %>%
+# Calcul de la différence des spreads pour Mai, Maïs
+spread_diff_may_maize <- spread_avg_may_maize %>%
   spread(key = Période, value = Spread_Moyenne) %>%
   mutate(Différence = `Après` - `Avant`)
 
-# Calcul de la différence des spreads pour Juillet
-spread_diff_july <- spread_avg_july %>%
+# Affichage des résultats
+cat("Résultats pour Mai - Maïs :\n")
+print(spread_diff_may_maize)
+
+```
+
+
+
+## July
+
+### Blé
+
+```{r}
+# Calcul de la moyenne des spreads avant et après la réforme pour Juillet, Blé
+spread_avg_july_wheat <- contracts_may_july %>%
+  filter(grepl("JULY", Indiv), Céréale == "Blé") %>%
+  group_by(Ville, Période) %>%
+  summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
+
+# Calcul de la différence des spreads pour Juillet, Blé
+spread_diff_july_wheat <- spread_avg_july_wheat %>%
   spread(key = Période, value = Spread_Moyenne) %>%
   mutate(Différence = `Après` - `Avant`)
 
-# Calcul des résultats généraux (pour toutes les villes)
+# Affichage des résultats
+cat("\nRésultats pour Juillet - Blé :\n")
+print(spread_diff_july_wheat)
+
+```
+
+### Maïs
+
+```{r}
+# Calcul de la moyenne des spreads avant et après la réforme pour Juillet, Maïs
+spread_avg_july_maize <- contracts_may_july %>%
+  filter(grepl("JULY", Indiv), Céréale == "Maïs") %>%
+  group_by(Ville, Période) %>%
+  summarise(Spread_Moyenne = mean(Spread, na.rm = TRUE), .groups = "drop")
+
+# Calcul de la différence des spreads pour Juillet, Maïs
+spread_diff_july_maize <- spread_avg_july_maize %>%
+  spread(key = Période, value = Spread_Moyenne) %>%
+  mutate(Différence = `Après` - `Avant`)
+
+# Affichage des résultats
+cat("\nRésultats pour Juillet - Maïs :\n")
+print(spread_diff_july_maize)
+
+```
+
+
+## Général
+```{r}
+# Calcul des résultats généraux pour toutes les villes, pour chaque période (avant et après)
 spread_avg_general <- contracts_may_july %>%
   group_by(Ville, Période) %>%
   summarise(Spread_Moyenne_Gen = mean(Spread, na.rm = TRUE), .groups = "drop")
@@ -836,13 +829,7 @@ spread_diff_general <- spread_avg_general %>%
   spread(key = Période, value = Spread_Moyenne_Gen) %>%
   mutate(Différence = `Après` - `Avant`)
 
-# Affichage des résultats pour Mai et Juillet
-cat("Résultats pour Mai :\n")
-print(spread_diff_may)
-
-cat("\nRésultats pour Juillet :\n")
-print(spread_diff_july)
-
+# Affichage des résultats
 cat("\nRésultats Généraux :\n")
 print(spread_diff_general)
 
@@ -851,55 +838,185 @@ print(spread_diff_general)
 
 
 
+# RECEIPTS AND SHIPMENTS
 
 
-
-# A FDAIEREE A LA FN
-
-# receipts and shipment
+## Points atypiques
 
 ```{r}
-# 📦 Chargement des packages nécessaires
-library(readxl)
-library(dplyr)
-library(plm)
-library(lmtest)
-library(sandwich)
-library(tibble)
 
-# 📁 Chargement des données depuis la feuille 5
+
+# 📁 Import des données
 df <- read_excel("Dataset1920_ln.xlsx", sheet = "Sheet4")
 
-# 📅 Transformation de la date
+# 📅 Transformation des dates et filtrage
 df <- df %>%
-  mutate(MONTH = as.Date(MONTH))
-
-# 📆 Filtrage sur la période de la novation : 1924 à 1927
-df <- df %>%
+  mutate(MONTH = as.Date(MONTH)) %>%
   filter(MONTH >= as.Date("1924-01-01") & MONTH <= as.Date("1927-12-31"))
 
-# 🎯 Création des variables de traitement
+# 🎯 Création des variables DiD
 df <- df %>%
   mutate(
     POST = ifelse(MONTH >= as.Date("1926-02-01"), 1, 0),
     Treat_Post = TREATMENT * POST
   )
 
-# 🧪 Fonction d'estimation TWFE avec SE robustes
+# ⚠️ Détection des outliers via RosnerTest
+rosner_receipts <- rosnerTest(na.omit(df$RECEIPTS), k = 10)
+rosner_shipments <- rosnerTest(na.omit(df$SHIPMENTS), k = 10)
+
+rosner_receipts
+rosner_shipments
+# 🔍 Extraire les valeurs à exclure
+receipts_outliers <- rosner_receipts$all.stats %>%
+  filter(Outlier == TRUE) %>%
+  pull(Value)
+
+shipments_outliers <- rosner_shipments$all.stats %>%
+  filter(Outlier == TRUE) %>%
+  pull(Value)
+
+# 🧼 Nettoyage de la base (exclusion des outliers)
+df_clean <- df %>%
+  filter(!RECEIPTS %in% receipts_outliers,
+         !SHIPMENTS %in% shipments_outliers)
+
+# 📊 Fonction pour afficher des statistiques propres
+describe_clean <- function(data, varname) {
+  vec <- data[[varname]]
+  cat(paste0("\n--- Statistiques descriptives (nettoyées) pour ", varname, " ---\n"))
+  print(summary(vec))
+  cat("Écart-type :", round(sd(vec, na.rm = TRUE), 2), "\n")
+}
+
+# 🧾 Statistiques après nettoyage
+describe_clean(df_clean, "RECEIPTS")
+describe_clean(df_clean, "SHIPMENTS")
+
+```
+
+
+
+## Vérification tendances parallèles
+
+### Receipts
+```{r}
+# 📅 1. Filtrer uniquement la période pré-traitement
+df_pre <- df %>%
+  filter(MONTH < as.Date("1926-02-01")) %>%
+  mutate(
+    time_to_treat = as.numeric(MONTH - as.Date("1925-01-01")),
+    treated_group = ifelse(CITY == "Chicago", 1, 0)
+  )
+
+# 🔎 2. Vérification des groupes
+table(df_pre$treated_group)  # 1 = Chicago, 0 = autres villes
+
+# 📊 3. Régression linéaire avec interaction temps * groupe traité
+model_parallel <- lm(RECEIPTS ~ time_to_treat * treated_group, data = df_pre)
+result <- broom::tidy(model_parallel) %>% filter(term == "time_to_treat:treated_group")
+print(result)
+
+# 🧠 4. Interprétation de l’interaction
+if (nrow(result) > 0 && !is.na(result$p.value)) {
+  pval <- result$p.value
+  cat("\n--- Interprétation des tendances parallèles ---\n")
+  if (pval < 0.05) {
+    cat("⚠️ Tendance non parallèle détectée (p =", round(pval, 3), ")\n")
+  } else {
+    cat("✅ Hypothèse de tendances parallèles acceptable (p =", round(pval, 3), ")\n")
+  }
+} else {
+  cat("⚠️ Résultat non interprétable : interaction non estimée.\n")
+}
+
+# 📈 5. Visualisation des tendances par groupe (Chicago vs autres)
+plot_data <- df_pre %>%
+  group_by(MONTH, treated_group) %>%
+  summarise(mean_receipts = mean(RECEIPTS, na.rm = TRUE), .groups = "drop")
+
+ggplot(plot_data, aes(x = MONTH, y = mean_receipts, color = factor(treated_group))) +
+  geom_line(size = 1) +
+  labs(
+    x = "Date", y = "Receipts", color = "Groupe traité",
+   
+  ) +
+  scale_color_manual(values = c("0" = "grey40", "1" = "steelblue"),
+                     labels = c("0" = "Autres villes", "1" = "Chicago")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+### Shipments
+
+```{r}
+# 📅 1. Filtrer uniquement la période pré-traitement
+df_pre_ship <- df %>%
+  filter(MONTH < as.Date("1926-02-01")) %>%
+  mutate(
+    time_to_treat = as.numeric(MONTH - as.Date("1925-01-01")),
+    treated_group = ifelse(CITY == "Chicago", 1, 0)
+  )
+
+# 🔎 2. Vérification des groupes
+table(df_pre_ship$treated_group)  # 1 = Chicago, 0 = autres villes
+
+# 📊 3. Régression linéaire avec interaction temps * groupe traité
+model_parallel_ship <- lm(SHIPMENTS ~ time_to_treat * treated_group, data = df_pre_ship)
+result_ship <- broom::tidy(model_parallel_ship) %>% filter(term == "time_to_treat:treated_group")
+print(result_ship)
+
+
+# 🧠 4. Interprétation de l’interaction
+if (nrow(result_ship) > 0 && !is.na(result_ship$p.value)) {
+  pval <- result_ship$p.value
+  cat("\n--- Interprétation des tendances parallèles (SHIPMENTS) ---\n")
+  if (pval < 0.05) {
+    cat("⚠️ Tendance non parallèle détectée (p =", round(pval, 3), ")\n")
+  } else {
+    cat("✅ Hypothèse de tendances parallèles acceptable (p =", round(pval, 3), ")\n")
+  }
+} else {
+  cat("⚠️ Résultat non interprétable : interaction non estimée.\n")
+}
+
+# 📈 5. Visualisation des tendances par groupe (Chicago vs autres)
+plot_data_ship <- df_pre_ship %>%
+  group_by(MONTH, treated_group) %>%
+  summarise(mean_shipments = mean(SHIPMENTS, na.rm = TRUE), .groups = "drop")
+
+ggplot(plot_data_ship, aes(x = MONTH, y = mean_shipments, color = factor(treated_group))) +
+  geom_line(size = 1) +
+  labs(
+    x = "Date", y = "Shipments", color = "Groupe traité",
+   
+  ) +
+  scale_color_manual(values = c("0" = "grey40", "1" = "steelblue"),
+                     labels = c("0" = "Autres villes", "1" = "Chicago")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+## TWSE
+```{r}
+# 🧪 Fonction d’estimation TWFE (DiD) avec erreurs robustes
 run_did <- function(outcome_name) {
-  data <- df %>% filter(!is.na(.data[[outcome_name]]))
-  
+  data <- df_clean %>% filter(!is.na(.data[[outcome_name]]))
   panel <- pdata.frame(data, index = c("INDIVIDU", "MONTH"))
 
   model <- plm(as.formula(paste(outcome_name, "~ Treat_Post")),
                data = panel,
                effect = "twoways", model = "within", na.action = na.omit)
-  
+
   se <- coeftest(model, vcovSCC(model, type = "HC0"))["Treat_Post", "Std. Error"]
   est <- coef(model)["Treat_Post"]
   tval <- est / se
   pval <- 2 * pt(abs(tval), df = model$df.residual, lower.tail = FALSE)
-  stars <- ifelse(pval < 0.001, "***", ifelse(pval < 0.01, "**", ifelse(pval < 0.05, "*", "")))
+  stars <- ifelse(pval < 0.001, "***", ifelse(pval < 0.01, "**",
+                  ifelse(pval < 0.05, "*", "")))
 
   N <- length(unique(data$INDIVIDU))
   N1 <- length(unique(data$INDIVIDU[data$TREATMENT == 1]))
@@ -919,22 +1036,262 @@ run_did <- function(outcome_name) {
   ))
 }
 
-# 🧾 Exécution sur RECEIPTS et SHIPMENTS
-results_novation <- bind_rows(
+# 🧾 Exécution sur RECEIPTS et SHIPMENTS (nettoyés)
+results_novation_clean <- bind_rows(
   run_did("RECEIPTS"),
   run_did("SHIPMENTS")
 )
 
-# 🖥️ Affichage
-print(results_novation)
+# 🖥️ Affichage des résultats
+print(results_novation_clean)
+
+```
+
+
+
+## Estimation SDiD pour Receipt
+
+```{r}
+library(synthdid)
+library(dplyr)
+
+# 📄 Préparer les données panel pour RECEIPTS (base originale car pas d'outliers)
+panel_receipts <- df %>%
+  dplyr::select(INDIVIDU, MONTH, RECEIPTS, TREATMENT) %>%
+  filter(!is.na(RECEIPTS)) %>%
+  arrange(INDIVIDU, MONTH)
+
+# ⚖️ Identifier les unités avec données complètes
+nb_periods <- length(unique(panel_receipts$MONTH))
+
+valid_units <- panel_receipts %>%
+  group_by(INDIVIDU) %>%
+  summarise(n_obs = n()) %>%
+  filter(n_obs == nb_periods) %>%
+  pull(INDIVIDU)
+
+# 🧼 Garder panel équilibré
+panel_receipts_balanced <- panel_receipts %>%
+  filter(INDIVIDU %in% valid_units)
+
+# 🧪 Matrice synthdid
+Ymat_receipts <- panel.matrices(as.data.frame(panel_receipts_balanced),
+                                unit = 1, time = 2, outcome = 3, treatment = 4)
+
+# 📈 Estimation SDiD
+tau_sdid_receipts <- synthdid_estimate(Ymat_receipts$Y, Ymat_receipts$N0, Ymat_receipts$T0)
+
+# 📝 Résumé
+summary(tau_sdid_receipts)
+plot(tau_sdid_receipts)
+
+# 🎯 IC placebo
+se_rec <- sqrt(vcov(tau_sdid_receipts, method = "placebo"))
+
+sprintf("Point estimate: %1.2f", tau_sdid_receipts)
+sprintf("95%% CI: (%1.2f, %1.2f)", tau_sdid_receipts - 1.96 * se_rec, tau_sdid_receipts + 1.96 * se_rec)
+
+
+```
+
+
+
+
+
+
+## Estimation SDiD pour Shipment
+
+```{r}
+
+
+# 📄 Préparer les données panel
+panel_shipments <- df_clean %>%
+  dplyr::select(INDIVIDU, MONTH, SHIPMENTS, TREATMENT) %>%
+  filter(!is.na(SHIPMENTS)) %>%
+  arrange(INDIVIDU, MONTH)
+
+# ⚖️ Créer un panel équilibré : unités avec données à chaque période
+nb_periods_ship <- length(unique(panel_shipments$MONTH))
+
+valid_units_ship <- panel_shipments %>%
+  group_by(INDIVIDU) %>%
+  summarise(n_obs = n()) %>%
+  filter(n_obs == nb_periods_ship) %>%
+  pull(INDIVIDU)
+
+# 🔁 Panel équilibré uniquement
+panel_shipments_balanced <- panel_shipments %>%
+  filter(INDIVIDU %in% valid_units_ship)
+
+# 🧪 Construire la matrice synthdid
+Ymat_shipments <- panel.matrices(as.data.frame(panel_shipments_balanced),
+                                 unit = 1, time = 2, outcome = 3, treatment = 4)
+
+# 📈 Estimation SDiD
+tau_sdid_ship <- synthdid_estimate(Ymat_shipments$Y, Ymat_shipments$N0, Ymat_shipments$T0)
+
+# 📝 Résumé
+summary(tau_sdid_ship)
+
+# 📊 Visualisation
+plot(tau_sdid_ship)
+
+# 🎯 Intervalle de confiance (placebo)
+se_ship <- sqrt(vcov(tau_sdid_ship, method = "placebo"))
+sprintf("Point estimate: %1.2f", tau_sdid_ship)
+sprintf("95%% CI: (%1.2f, %1.2f)", tau_sdid_ship - 1.96 * se_ship, tau_sdid_ship + 1.96 * se_ship)
+
+```
+
+
+
+
+
+
+
+# OPEN INTEREST
+
+```{r}
+# 📦 Chargement des packages nécessaires
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(broom)
+
+# 📁 Charger les données
+oc_data <- read_excel("open_commitment_1920s.xlsx", sheet = "OC3")
+
+# 🧼 Nettoyage et construction de la date
+oc_data <- oc_data %>%
+  mutate(
+    Date = as.Date(paste(Year, Month, Day, sep = "-")),
+    Treatment = ifelse(City == "Chicago", 1, 0)
+  ) %>%
+  filter(!is.na(Open_Commitment))  # garde seulement les lignes valides
+```
+
+## Vérification des tendances parallèles 
+
+```{r}
+# 📆 Données pré-traitement uniquement
+oc_pre <- oc_data %>%
+  filter(Date < as.Date("1926-02-01")) %>%
+  mutate(time_to_treat = as.numeric(Date - as.Date("1925-01-01")))
+
+# ✅ Vérification de la distribution des groupes
+print(table(oc_pre$City))
+print(table(oc_pre$Treatment))
+
+# 📊 Régression pour tester les tendances parallèles
+model_parallel <- lm(Open_Commitment ~ time_to_treat + Treatment + time_to_treat*Treatment, data = oc_pre)
+result <- tidy(model_parallel) %>% filter(term == "time_to_treat:Treatment")
+print(result)
+
+# 🔍 Interprétation simple
+if (nrow(result) > 0) {
+  pval <- result$p.value
+  cat("\n--- Interprétation ---\n")
+  if (pval < 0.05) {
+    cat("⚠️ Tendance non parallèle détectée (p =", round(pval, 3), ")\n")
+  } else {
+    cat("✅ Hypothèse de tendances parallèles acceptable (p =", round(pval, 3), ")\n")
+  }
+}
+
+# 📈 Visualisation des tendances pré-traitement par ville
+plot_data <- oc_pre %>%
+  group_by(Date, City) %>%
+  summarise(mean_oc = mean(Open_Commitment, na.rm = TRUE), .groups = "drop")
+
+ggplot(plot_data, aes(x = Date, y = mean_oc, color = City)) +
+  geom_line(size = 1) +
+  labs(
+       x = "Date", y = "Open Commitments") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+
+## Points atypiques
+```{r}
+# 📦 Packages pour détection de valeurs atypiques
+library(EnvStats)
+
+# Appliquer le test de Rosner sur Open_Commitment
+rosner_result <- rosnerTest(oc_data$Open_Commitment, k = 10, alpha = 0.05)
+
+# Résultat du test
+print(rosner_result)
 
 ```
 
 ```{r}
+# Extraire les numéros d'observations à exclure
+outliers_index <- rosner_result$all.stats %>%
+  filter(Outlier == TRUE) %>%
+  pull(Obs.Num)
+
+# Exclure ces observations de la base
+oc_data_clean <- oc_data[-outliers_index, ]
 
 ```
 
 
 
+## Statistiques descriptives 
+```{r}
+# Statistiques descriptives globales sur les engagements ouverts
+summary_stats <- oc_data_clean %>%
+  summarise(
+    N = n(),
+    Moyenne = mean(Open_Commitment, na.rm = TRUE),
+    Médiane = median(Open_Commitment, na.rm = TRUE),
+    Écart_type = sd(Open_Commitment, na.rm = TRUE),
+    Min = min(Open_Commitment, na.rm = TRUE),
+    Max = max(Open_Commitment, na.rm = TRUE)
+  )
 
+print(summary_stats)
+
+```
+
+
+## Modèle DID pour calculer les open interest 
+
+```{r}
+# 🔁 Ajouter les variables POST et Treat_Post
+oc_data_clean <- oc_data_clean %>%
+  mutate(
+    POST = ifelse(Date >= as.Date("1926-02-01"), 1, 0),
+    Treat_Post = Treatment * POST
+  )
+
+# 📐 Créer le panel propre
+oc_panel_clean <- pdata.frame(oc_data_clean, index = c("Indiv", "Date"))
+
+# 📊 Régression DiD avec effets fixes (Driscoll-Kraay robust)
+did_model_clean <- plm(Open_Commitment ~ Treat_Post,
+                       data = oc_panel_clean,
+                       model = "within", effect = "twoways")
+
+did_result_clean <- coeftest(did_model_clean, vcov = vcovSCC(did_model_clean, type = "HC0"))
+
+# 🧾 Résumé formaté
+summary_did_clean <- tidy(did_result_clean) %>%
+  filter(term == "Treat_Post") %>%
+  mutate(
+    signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    )
+  )
+
+print(summary_did_clean)
+
+```
 
