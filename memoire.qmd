@@ -526,30 +526,6 @@ ggplot(subset(contracts_july_corn, !is.na(Close)), aes(x = Date, y = Close, colo
   theme_minimal()
 ```
 
-### Visualisation graphique de l'effet DiD estimé - échéance JULY
-
-```{r graph-did-july}
-a1_did_sample_july <- rbind(
-  a1[grepl("CHI-WHEAT-JULY", a1$Indiv), ],
-  a1[grepl("KC_WHEAT_JULY|STL-WHEAT-JULY", a1$Indiv), ]
-)
-a1_did_sample_july <- a1_did_sample_july %>%
-  mutate(Groupe = ifelse(grepl("CHI", Indiv), "Treated", "Control"),
-         Période = factor(ifelse(as.Date(Date) >= as.Date("1926-02-01"), "Après", "Avant"), levels = c("Avant", "Après")))
-
-mean_did_july <- a1_did_sample_july %>%
-  group_by(Groupe, Période) %>%
-  summarise(Prix_moyen = mean(Close, na.rm = TRUE), .groups = "drop")
-
-ggplot(mean_did_july, aes(x = Période, y = Prix_moyen, group = Groupe, color = Groupe)) +
-  geom_line(linewidth = 1.5) +
-  geom_point(size = 3) +
-  labs(title = "Effet estimé de la novation (DiD) - Contrats JULY",
-       x = "Période", y = "Prix moyen") +
-  theme_minimal()
-```
-
-
 ### Calcul de la volatilité simple par contrat - JULY
 
 ```{r}
