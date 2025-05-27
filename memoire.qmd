@@ -595,6 +595,43 @@ print(vol_diff_may_july)
 ```
 
 
+## Graphique de toutes les courbes 
+
+```{r}
+# Filtrage des données pour WHEAT et CORN en MAY ou JULY
+courbes_df <- a1 %>%
+  as.data.frame() %>%
+  filter(grepl("WHEAT|CORN", Indiv),
+         grepl("MAY|JULY", Indiv),
+         !is.na(Close)) %>%
+  mutate(
+    Céréale = case_when(
+      grepl("WHEAT", Indiv) ~ "Blé",
+      grepl("CORN", Indiv) ~ "Maïs"
+    ),
+    Échéance = case_when(
+      grepl("MAY", Indiv) ~ "Mai",
+      grepl("JULY", Indiv) ~ "Juillet"
+    ),
+    Échéance = factor(Échéance, levels = c("Mai", "Juillet"))  # ⬅️ Ordre forcé
+  )
+
+# Tracé de toutes les courbes
+ggplot(courbes_df, aes(x = Date, y = Close, color = Indiv)) +
+  geom_line(linewidth = 0.9) +
+  facet_grid(Céréale ~ Échéance, scales = "free_y") +
+  labs(
+
+    x = "Date", y = "Prix de clôture",
+    color = "Contrat"
+  ) +
+  geom_vline(xintercept = as.Date("1926-02-01"), linetype = "dashed", color = "black") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
 
 
 # DIFFERENCES-EN-DIFFERENCES (DID)
@@ -857,15 +894,28 @@ df_clean <- df %>%
   filter(!RECEIPTS %in% receipts_outliers,
          !SHIPMENTS %in% shipments_outliers)
 
-# 📊 Fonction pour afficher des statistiques propres
+
+
+```
+
+## Statistiques descriptives
+
+```{r}
 describe_clean <- function(data, varname) {
   vec <- data[[varname]]
+  vec <- vec[!is.na(vec)]  # Retirer les NA
+  
   cat(paste0("\n--- Statistiques descriptives (nettoyées) pour ", varname, " ---\n"))
-  print(summary(vec))
-  cat("Écart-type :", round(sd(vec, na.rm = TRUE), 2), "\n")
+  cat("N :", length(vec), "\n")
+  cat("Mean :", round(mean(vec), 2), "\n")
+  cat("Median :", round(median(vec), 2), "\n")
+  cat("Min :", round(min(vec), 2), "\n")
+  cat("Max :", round(max(vec), 2), "\n")
+  cat("St. Dev. :", round(sd(vec), 2), "\n")
+  cat("Skewness :", round(e1071::skewness(vec, na.rm = TRUE), 2), "\n")
+  cat("Kurtosis :", round(e1071::kurtosis(vec, na.rm = TRUE), 2), "\n")
 }
-
-# 🧾 Statistiques après nettoyage
+library(e1071)
 describe_clean(df_clean, "RECEIPTS")
 describe_clean(df_clean, "SHIPMENTS")
 
@@ -1218,18 +1268,24 @@ oc_data_clean <- oc_data[-outliers_index, ]
 
 ## Statistiques descriptives 
 ```{r}
-# Statistiques descriptives globales sur les engagements ouverts
+
+library(e1071)
+
+# Statistiques descriptives globales sur les engagements ouverts (Open Commitment)
 summary_stats <- oc_data_clean %>%
   summarise(
-    N = n(),
-    Moyenne = mean(Open_Commitment, na.rm = TRUE),
-    Médiane = median(Open_Commitment, na.rm = TRUE),
-    Écart_type = sd(Open_Commitment, na.rm = TRUE),
-    Min = min(Open_Commitment, na.rm = TRUE),
-    Max = max(Open_Commitment, na.rm = TRUE)
+    N = sum(!is.na(Open_Commitment)),
+    Moyenne = round(mean(Open_Commitment, na.rm = TRUE), 2),
+    Médiane = round(median(Open_Commitment, na.rm = TRUE), 2),
+    Écart_type = round(sd(Open_Commitment, na.rm = TRUE), 2),
+    Min = round(min(Open_Commitment, na.rm = TRUE), 2),
+    Max = round(max(Open_Commitment, na.rm = TRUE), 2),
+    Skewness = round(skewness(Open_Commitment, na.rm = TRUE), 2),
+    Kurtosis = round(kurtosis(Open_Commitment, na.rm = TRUE), 2)
   )
 
 print(summary_stats)
+
 
 ```
 
@@ -1270,4 +1326,3 @@ summary_did_clean <- tidy(did_result_clean) %>%
 print(summary_did_clean)
 
 ```
-
